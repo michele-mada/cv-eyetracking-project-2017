@@ -1,4 +1,4 @@
-from skimage import color, io, feature
+from skimage import color, io, feature, img_as_ubyte, img_as_float
 from skimage.feature import peak_local_max
 from skimage.transform import hough_circle
 from skimage.draw import circle_perimeter
@@ -7,6 +7,11 @@ import matplotlib.patches as patches
 import cv2
 import numpy as np
 import argparse
+
+from utils.camera import WebcamVideoStream
+
+
+camera_port = 0
 
 
 def find_eye_center(eye):
@@ -33,15 +38,17 @@ def find_eye_center(eye):
         accums.extend(h[peaks[:, 0], peaks[:, 1]])
         radii.extend([radius] * num_peaks)
 
-    best_circle_index = np.argsort(accums)[::-1][0]
-    center_y, center_x = centers[best_circle_index]
-    #cx, cy = circle_perimeter(center_x, center_y, radii[best_circle_index])
-    #image = color.gray2rgb(eye)
-    #image[cy, cx] = (220, 20, 20)
-    return center_x, center_y
+    try:
+        best_circle_index = np.argsort(accums)[::-1][0]
+        center_y, center_x = centers[best_circle_index]
+        #cx, cy = circle_perimeter(center_x, center_y, radii[best_circle_index])
+        #image = color.gray2rgb(eye)
+        #image[cy, cx] = (220, 20, 20)
+        return center_x, center_y
+    except IndexError:
+        return 0, 0
 
-
-def find_eyes(imagePath, cascPath):
+def find_eyes(image, cascPath):
     """
     Uses an OpenCV haar cascade to locate the rectangles of the image in which
     each eye resides
@@ -50,12 +57,11 @@ def find_eyes(imagePath, cascPath):
     """
     cascade = cv2.CascadeClassifier(cascPath)
     # Read the image
-    image = cv2.imread(imagePath)
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    #image = cv2.imread(imagePath)
 
     # Detect faces in the image
     eyes = cascade.detectMultiScale(
-        gray,
+        image,
         scaleFactor=1.1,
         minNeighbors=5,
         minSize=(30, 30),
@@ -91,9 +97,11 @@ def split_eyes(eyes):
     return right_eye, left_eye
 
 
-def main(cli):
-    eyes = find_eyes(cli.file, cli.cascade_file)
-    picture = color.rgb2gray(io.imread(cli.file))
+def process_frame(image_cv2format):
+    picture = img_as_float(image_cv2format)
+    eyes = find_eyes(image_cv2format, cli.cascade_file)
+    if len(eyes) < 2:
+        return picture, (0, 0, 0, 0), (0, 0, 0, 0), (0, 0), (0, 0)
     right_eye, left_eye = split_eyes(eyes)
 
     right_eyepatch = cropped_rect(picture, right_eye)
@@ -104,7 +112,17 @@ def main(cli):
     left_pupil_x, left_pupil_y = find_eye_center(left_eyepatch)
     left_pupil = (left_pupil_x + left_eye[0], left_pupil_y + left_eye[1])
 
-    print("Eyes: %s\n  Right pupil: %s\n  Left pupil: %s" % (", ".join(map(str, eyes)), str(right_pupil), str(left_pupil)))
+    return picture, right_eye, left_eye, right_pupil, left_pupil
+
+
+def one_shot(cli):
+    image_cv2 = cv2.imread(cli.file)
+    image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
+
+    picture, right_eye, left_eye, right_pupil, left_pupil = process_frame(image_cv2_gray)
+
+    print("Eyes (R,L): %s, %s\n  Right pupil: %s\n  Left pupil: %s" %
+          (str(right_eye), str(left_eye), str(right_pupil), str(left_pupil)))
 
     # draw stuff
     eye1 = right_eye
@@ -112,9 +130,9 @@ def main(cli):
     fig, ax = plt.subplots(1)
     ax.imshow(picture, cmap="gray")
     ax.add_patch(patches.Rectangle(
-        (eye1[0], eye1[1]),   # (x,y)
-        eye1[2],          # width
-        eye1[3],          # height
+        (eye1[0], eye1[1]),  # (x,y)
+        eye1[2],  # width
+        eye1[3],  # height
         linewidth=1, edgecolor='r', facecolor='none'
     ))
     ax.add_patch(patches.Rectangle(
@@ -128,9 +146,52 @@ def main(cli):
     plt.show()
 
 
+def live(cli):
+    camera = WebcamVideoStream(src=camera_port)
+    camera.start()
+    plt.ion()
+    fig, ax = plt.subplots(1)
+
+    while plt.fignum_exists(1):
+        image_cv2 = camera.read()
+        image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
+
+        picture, right_eye, left_eye, right_pupil, left_pupil = process_frame(image_cv2_gray)
+
+        eye1 = right_eye
+        eye2 = left_eye
+        plt.cla()
+        ax.imshow(picture, cmap="gray")
+        ax.add_patch(patches.Rectangle(
+            (eye1[0], eye1[1]),  # (x,y)
+            eye1[2],  # width
+            eye1[3],  # height
+            linewidth=1, edgecolor='r', facecolor='none'
+        ))
+        ax.add_patch(patches.Rectangle(
+            (eye2[0], eye2[1]),  # (x,y)
+            eye2[2],  # width
+            eye2[3],  # height
+            linewidth=1, edgecolor='r', facecolor='none'
+        ))
+        ax.plot(right_pupil[0], right_pupil[1], "r+")
+        ax.plot(left_pupil[0], left_pupil[1], "r+")
+        #plt.show()
+        plt.pause(0.1)
+
+    camera.stop()
+
+
+def main(cli):
+    if cli.file == "-":
+        live(cli)
+    else:
+        one_shot(cli)
+
+
 def parsecli():
     parser = argparse.ArgumentParser(description="Find eyes and eye-centers from an image")
-    parser.add_argument('file', help='picture file name', type=str)
+    parser.add_argument('file', help='filename of the picture; - for webcam', type=str)
     parser.add_argument('-c', '--cascade-file', help='path to the .xml file with the eye-detection haar cascade',
                         type=str, default="haarcascade_righteye_2splits.xml")
     return parser.parse_args()
