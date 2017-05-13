@@ -1,7 +1,8 @@
-from skimage import color, io, feature, img_as_ubyte, img_as_float
-from skimage.feature import peak_local_max
-from skimage.transform import hough_circle
-from skimage.draw import circle_perimeter
+from skimage import img_as_float, measure
+from skimage.transform import hough_circle, hough_circle_peaks
+from skimage.filters import threshold_otsu
+from skimage.feature import corner_harris, corner_peaks
+from skimage import exposure
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import cv2
@@ -14,39 +15,47 @@ from utils.camera import WebcamVideoStream
 camera_port = 0
 
 
-def find_eye_center(eye):
-    """
-    Finds the center of the eye's pupil using circular hough transform
-    :param eye: numpy 2d array of image intensities [0, 1]
-    :return: center_x, center_y coordinates of the center of the pupil
-    """
-    edges = feature.canny(eye, sigma=3)
+def find_eye_center_and_corners(eye):
 
-    # Detect two radii
-    hough_radii = np.arange(15, 30, 2)
-    hough_res = hough_circle(edges, hough_radii)
+    thresh = threshold_otsu(eye) * 0.5
+    eye_binary = eye < thresh
+
+    corners = corner_peaks(corner_harris(eye_binary))
 
     centers = []
     accums = []
     radii = []
+    hough_radii = np.arange(10, 25, 2)
 
-    for radius, h in zip(hough_radii, hough_res):
-        # For each radius, extract two circles
-        num_peaks = 2
-        peaks = peak_local_max(h, num_peaks=num_peaks)
-        centers.extend(peaks)
-        accums.extend(h[peaks[:, 0], peaks[:, 1]])
-        radii.extend([radius] * num_peaks)
 
-    try:
-        best_circle_index = np.argsort(accums)[::-1][0]
-        center_y, center_x = centers[best_circle_index]
-        #cx, cy = circle_perimeter(center_x, center_y, radii[best_circle_index])
-        #image = color.gray2rgb(eye)
-        #image[cy, cx] = (220, 20, 20)
-        return center_x, center_y
-    except IndexError:
-        return 0, 0
+    blobs_labels, nlabels = measure.label(eye_binary, background=0, return_num=True)
+    print("labels:",nlabels)
+
+    for n in range(1, nlabels):  # skip label zero
+        img = blobs_labels == n
+        hough_res = hough_circle(img, hough_radii)
+        _accums, cx, cy, _radii = hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1)
+        accums.extend(_accums)
+        centers.extend(zip(cx, cy))
+        radii.extend(_radii)
+
+    print(accums)
+    best_circle_index = np.argmax(np.array(accums))
+    print(best_circle_index)
+    center_y, center_x = centers[best_circle_index]
+
+    #TODO: find eye corners
+
+    fig, ax = plt.subplots(1)
+
+    ax.imshow(eye_binary, cmap="gray")
+
+    ax.imshow(blobs_labels, cmap='spectral')
+    ax.plot(center_y, center_x, "w+")
+    ax.plot(corners[:,1], corners[:,0], "ro")
+
+    return center_y, center_x  #TODO: return eye corners
+
 
 def find_eyes(image, cascPath):
     """
@@ -56,8 +65,6 @@ def find_eyes(image, cascPath):
     :return: list of lists representing the eye recangles [x, y, width, height]
     """
     cascade = cv2.CascadeClassifier(cascPath)
-    # Read the image
-    #image = cv2.imread(imagePath)
 
     # Detect faces in the image
     eyes = cascade.detectMultiScale(
@@ -98,18 +105,19 @@ def split_eyes(eyes):
 
 
 def process_frame(image_cv2format):
-    picture = img_as_float(image_cv2format)
+    picture_float = img_as_float(image_cv2format)
+    picture = exposure.equalize_hist(picture_float)
     eyes = find_eyes(image_cv2format, cli.cascade_file)
     if len(eyes) < 2:
         return picture, (0, 0, 0, 0), (0, 0, 0, 0), (0, 0), (0, 0)
     right_eye, left_eye = split_eyes(eyes)
 
     right_eyepatch = cropped_rect(picture, right_eye)
-    right_pupil_x, right_pupil_y = find_eye_center(right_eyepatch)
+    right_pupil_x, right_pupil_y = find_eye_center_and_corners(right_eyepatch)
     right_pupil = (right_pupil_x + right_eye[0], right_pupil_y + right_eye[1])
 
     left_eyepatch = cropped_rect(picture, left_eye)
-    left_pupil_x, left_pupil_y = find_eye_center(left_eyepatch)
+    left_pupil_x, left_pupil_y = find_eye_center_and_corners(left_eyepatch)
     left_pupil = (left_pupil_x + left_eye[0], left_pupil_y + left_eye[1])
 
     return picture, right_eye, left_eye, right_pupil, left_pupil
@@ -117,7 +125,9 @@ def process_frame(image_cv2format):
 
 def one_shot(cli):
     image_cv2 = cv2.imread(cli.file)
-    image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
+    #image_hsv = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2HSV)
+    #(channel_h, channel_s, channel_v) = cv2.split(image_hsv)
+    image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_RGB2GRAY)
 
     picture, right_eye, left_eye, right_pupil, left_pupil = process_frame(image_cv2_gray)
 
