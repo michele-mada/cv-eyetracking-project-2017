@@ -11,7 +11,7 @@ class Eye:
         self.area = Rect(*area)
         self.is_right = is_right
         self.pupil_relative = Point(0,0)
-        self.inner_corner_relative = Point(0,0)
+        self.inner_corner_relative = Point(0, 0)
         self.outer_corner_relative = Point(0, 0)
 
     @property

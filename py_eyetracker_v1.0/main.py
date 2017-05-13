@@ -44,8 +44,11 @@ def find_eye_center_and_corners(eye_image, eye_object, debug=False):
         radii.extend(_radii)
 
     # the center of the pupil is the center of the best circular region found
-    best_circle_index = np.argmax(np.array(accums))
-    center_x, center_y = centers[best_circle_index]
+    try:
+        best_circle_index = np.argmax(np.array(accums))
+        center_x, center_y = centers[best_circle_index]
+    except ValueError:
+        return
 
     # Part 1: finding the corners of the eye
 
@@ -173,35 +176,39 @@ def one_shot(cli):
 
     ax.imshow(picture, cmap="gray")
 
-    # draw eye regions (found using the haar cascade)
-    ax.add_patch(patches.Rectangle(
-        (right_eye.area.x, right_eye.area.y),
-        right_eye.area.width,
-        right_eye.area.height,
-        linewidth=1, edgecolor='r', facecolor='none'
-    ))
-    ax.add_patch(patches.Rectangle(
-        (left_eye.area.x, left_eye.area.y),
-        left_eye.area.width,
-        left_eye.area.height,
-        linewidth=1, edgecolor='r', facecolor='none'
-    ))
-    # draw pupil spots (red)
-    ax.plot(right_eye.pupil[0], right_eye.pupil[1], "r+")
-    ax.plot(left_eye.pupil[0], left_eye.pupil[1], "r+")
-    # draw inner corners (green)
-    ax.plot(right_eye.inner_corner[0], right_eye.inner_corner[1], "g+")
-    ax.plot(left_eye.inner_corner[0], left_eye.inner_corner[1], "g+")
-    # draw outer corners (blue)
-    ax.plot(right_eye.outer_corner[0], right_eye.outer_corner[1], "b+")
-    ax.plot(left_eye.outer_corner[0], left_eye.outer_corner[1], "b+")
+    if right_eye is not None and left_eye is not None:
+        # draw eye regions (found using the haar cascade)
+        ax.add_patch(patches.Rectangle(
+            (right_eye.area.x, right_eye.area.y),
+            right_eye.area.width,
+            right_eye.area.height,
+            linewidth=1, edgecolor='r', facecolor='none'
+        ))
+        ax.add_patch(patches.Rectangle(
+            (left_eye.area.x, left_eye.area.y),
+            left_eye.area.width,
+            left_eye.area.height,
+            linewidth=1, edgecolor='r', facecolor='none'
+        ))
+        # draw pupil spots (red)
+        ax.plot(right_eye.pupil[0], right_eye.pupil[1], "r+")
+        ax.plot(left_eye.pupil[0], left_eye.pupil[1], "r+")
+        # draw inner corners (green)
+        ax.plot(right_eye.inner_corner[0], right_eye.inner_corner[1], "g+")
+        ax.plot(left_eye.inner_corner[0], left_eye.inner_corner[1], "g+")
+        # draw outer corners (blue)
+        ax.plot(right_eye.outer_corner[0], right_eye.outer_corner[1], "b+")
+        ax.plot(left_eye.outer_corner[0], left_eye.outer_corner[1], "b+")
 
     plt.show()
 
 
 def live(cli):
-    #TODO: make this function work again
-    camera = WebcamVideoStream(src=camera_port)
+    camera = WebcamVideoStream(src=camera_port,
+                               debug=cli.debug,
+                               contrast=None if cli.contrast == "None" else float(cli.contrast),
+                               saturation=None if cli.saturation == "None" else float(cli.saturation)
+                               )
     camera.start()
     plt.ion()
     fig, ax = plt.subplots(1)
@@ -210,27 +217,33 @@ def live(cli):
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
-        picture, right_eye, left_eye, right_pupil, left_pupil = process_frame(image_cv2_gray)
+        picture, right_eye, left_eye = process_frame(image_cv2_gray, debug=False)
 
-        eye1 = right_eye
-        eye2 = left_eye
         plt.cla()
         ax.imshow(picture, cmap="gray")
-        ax.add_patch(patches.Rectangle(
-            (eye1[0], eye1[1]),  # (x,y)
-            eye1[2],  # width
-            eye1[3],  # height
-            linewidth=1, edgecolor='r', facecolor='none'
-        ))
-        ax.add_patch(patches.Rectangle(
-            (eye2[0], eye2[1]),  # (x,y)
-            eye2[2],  # width
-            eye2[3],  # height
-            linewidth=1, edgecolor='r', facecolor='none'
-        ))
-        ax.plot(right_pupil[0], right_pupil[1], "r+")
-        ax.plot(left_pupil[0], left_pupil[1], "r+")
-        #plt.show()
+        if right_eye is not None and left_eye is not None:
+            # draw eye regions (found using the haar cascade)
+            ax.add_patch(patches.Rectangle(
+                (right_eye.area.x, right_eye.area.y),
+                right_eye.area.width,
+                right_eye.area.height,
+                linewidth=1, edgecolor='r', facecolor='none'
+            ))
+            ax.add_patch(patches.Rectangle(
+                (left_eye.area.x, left_eye.area.y),
+                left_eye.area.width,
+                left_eye.area.height,
+                linewidth=1, edgecolor='r', facecolor='none'
+            ))
+            # draw pupil spots (red)
+            ax.plot(right_eye.pupil[0], right_eye.pupil[1], "r+")
+            ax.plot(left_eye.pupil[0], left_eye.pupil[1], "r+")
+            # draw inner corners (green)
+            ax.plot(right_eye.inner_corner[0], right_eye.inner_corner[1], "g+")
+            ax.plot(left_eye.inner_corner[0], left_eye.inner_corner[1], "g+")
+            # draw outer corners (blue)
+            ax.plot(right_eye.outer_corner[0], right_eye.outer_corner[1], "b+")
+            ax.plot(left_eye.outer_corner[0], left_eye.outer_corner[1], "b+")
         plt.pause(0.1)
 
     camera.stop()
@@ -248,6 +261,10 @@ def parsecli():
     parser.add_argument('file', help='filename of the picture; - for webcam', type=str)
     parser.add_argument('-c', '--cascade-file', help='path to the .xml file with the eye-detection haar cascade',
                         type=str, default="haarcascade_righteye_2splits.xml")
+    parser.add_argument('--saturation', help='override the webcam default saturation setting (value [0.0, 1.0])',
+                        type=str, default="None")
+    parser.add_argument('--contrast', help='override the webcam default contrast setting (value [0.0, 1.0])',
+                        type=str, default="None")
     parser.add_argument('-d','--debug', help='enable debug mode', action='store_true')
     return parser.parse_args()
 
