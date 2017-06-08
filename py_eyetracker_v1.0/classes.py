@@ -26,6 +26,14 @@ class Eye:
     def outer_corner(self):
         return Point(self.area.x + self.outer_corner_relative.x, self.area.y + self.outer_corner_relative.y)
 
+    @property
+    def absolute_area_center(self):
+        return Point(self.relative_area_center.x + self.area.x, self.relative_area_center.y + self.area.y)
+
+    @property
+    def relative_area_center(self):
+        return Point(self.area.width / 2, self.area.height / 2)
+
     def set_leftmost_corner(self, point):
         if self.is_right:
             self.outer_corner_relative = point

@@ -1,99 +1,23 @@
-from skimage import img_as_float, measure
-from skimage.transform import hough_circle, hough_circle_peaks
-from skimage.filters import threshold_otsu
-from skimage.feature import corner_harris, corner_peaks
-from skimage import exposure
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import cv2
-import numpy as np
 import argparse
 
-from utils.camera import WebcamVideoStream
-from classes import Eye, Point
+import cv2
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
+from skimage import img_as_float
 
+from classes import Eye
+from utils.camera import WebcamVideoStream
+from utils.eyecenter.timm.timm_and_barth import find_eye_center_and_corners_cl as find_eye_center_and_corners_tb
+from utils.eyecenter.timm.timm_and_barth import context as opencl_context
+from utils.eyecenter.py_eyecenter import find_eye_center_and_corners_hough
 
 camera_port = 0
 
-
-
-def find_eye_center_and_corners(eye_image, eye_object, debug=False):
-    assert(isinstance(eye_object, Eye))
-
-    # Part 1: finding the center of the eye
-
-    # apply a threshold to the image
-    thresh = threshold_otsu(eye_image) * 0.5
-    eye_binary = eye_image < thresh
-
-    # split the thresholded image into regions
-    blobs_labels, nlabels = measure.label(eye_binary, background=0, return_num=True)
-
-    centers = []
-    accums = []
-    radii = []
-    hough_radii = np.arange(10, 25, 2)
-
-    # foreach region, use the hough transform to find the most prominent circle
-    for n in range(1, nlabels):
-        img = blobs_labels == n
-        hough_res = hough_circle(img, hough_radii)
-        _accums, cx, cy, _radii = hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1)
-        accums.extend(_accums)
-        centers.extend(zip(cx, cy))
-        radii.extend(_radii)
-
-    # the center of the pupil is the center of the best circular region found
-    try:
-        best_circle_index = np.argmax(np.array(accums))
-        center_x, center_y = centers[best_circle_index]
-    except ValueError:
-        return
-
-    # Part 1: finding the corners of the eye
-
-    # heuristic to find the best corner, given its position relative to the pupil center
-    def corner_measure(corner, center, leftness=1):
-        cy, cx = corner
-        zx, zy = center
-        return (cx-zx) * leftness - 0.5 * abs(cy-zy)
-
-    # find the centers (y,x) of the corners, using harris
-    corners = corner_peaks(corner_harris(eye_binary))
-
-    # give each corner a score, according to our heuristic
-    left_corner_score = map(lambda corner: (corner,
-                                            corner_measure(corner, (center_x, center_y), leftness=1)
-                                            ),
-                            corners)
-    # find the best corner
-    left_corner = max(left_corner_score, key=lambda cs: cs[1])[0]
-
-    # give each corner a score, according to our heuristic
-    right_corner_score = map(lambda corner: (corner,
-                                             corner_measure(corner, (center_x, center_y), leftness=-1)
-                                             ),
-                             corners)
-    # find the best corner
-    right_corner = max(right_corner_score, key=lambda cs: cs[1])[0]
-
-    if debug:
-        fig, ax = plt.subplots(1)
-
-        ax.imshow(eye_binary, cmap="gray")
-
-        ax.imshow(blobs_labels, cmap='spectral')
-        ax.plot(center_x, center_y, "w+")
-
-        ax.plot(corners[:,1], corners[:,0], "bo")
-
-        ax.plot(left_corner[1], left_corner[0], "ro")
-        ax.plot(right_corner[1], right_corner[0], "go")
-
-    eye_object.pupil_relative = Point(center_x, center_y)
-    eye_object.set_leftmost_corner(Point(x=left_corner[1], y=left_corner[0]))
-    eye_object.set_rightmost_corner(Point(x=right_corner[1], y=right_corner[0]))
-
+algos = {
+    "hough": find_eye_center_and_corners_hough,
+    "timm": find_eye_center_and_corners_tb
+}
 
 
 def find_eyes(image, cascPath):
@@ -143,20 +67,22 @@ def split_eyes(eyes):
     return Eye(right_eye, True), Eye(left_eye, False)
 
 
-def process_frame(image_cv2format, debug=False):
+def process_frame(image_cv2format, algo, debug=False):
+    find_eye_center_and_corners = algos[algo]
     picture_float = img_as_float(image_cv2format)
-    picture = exposure.equalize_hist(picture_float)
+    #picture = exposure.equalize_hist(picture_float)
+    picture = picture_float
     eyes = find_eyes(image_cv2format, cli.cascade_file)
     if len(eyes) < 2:
         return picture, None, None
 
     right_eye, left_eye = split_eyes(eyes)
 
-    right_eyepatch = cropped_rect(picture, right_eye.area)
-    find_eye_center_and_corners(right_eyepatch, right_eye, debug=debug)
-
     left_eyepatch = cropped_rect(picture, left_eye.area)
     find_eye_center_and_corners(left_eyepatch, left_eye, debug=debug)
+
+    right_eyepatch = cropped_rect(picture, right_eye.area)
+    find_eye_center_and_corners(right_eyepatch, right_eye, debug=debug)
 
     return picture, right_eye, left_eye
 
@@ -167,7 +93,7 @@ def one_shot(cli):
     #(channel_h, channel_s, channel_v) = cv2.split(image_hsv)
     image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_RGB2GRAY)
 
-    picture, right_eye, left_eye  = process_frame(image_cv2_gray, debug=cli.debug)
+    picture, right_eye, left_eye  = process_frame(image_cv2_gray, cli.algo, debug=cli.debug)
 
     print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
 
@@ -217,7 +143,7 @@ def live(cli):
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
-        picture, right_eye, left_eye = process_frame(image_cv2_gray, debug=False)
+        picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo, debug=False)
 
         plt.cla()
         ax.imshow(picture, cmap="gray")
@@ -250,6 +176,8 @@ def live(cli):
 
 
 def main(cli):
+    if cli.algo == "timm":
+        opencl_context.load_program(cli.program_timm)
     if cli.file == "-":
         live(cli)
     else:
@@ -265,6 +193,10 @@ def parsecli():
                         type=str, default="None")
     parser.add_argument('--contrast', help='override the webcam default contrast setting (value [0.0, 1.0])',
                         type=str, default="None")
+    parser.add_argument('-a','--algo', help='algorithm to use (hough or timm)(default to timm)',
+                        type=str, default="timm")
+    parser.add_argument('-p', '--program-timm', help='path to the opencl kernel implementing timm and barth algorithm',
+                        type=str, default="timm_barth_kernel.cl")
     parser.add_argument('-d','--debug', help='enable debug mode', action='store_true')
     return parser.parse_args()
 
