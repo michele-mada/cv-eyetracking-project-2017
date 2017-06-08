@@ -1,8 +1,6 @@
 import pyopencl as cl
 import numpy as np
 
-from skimage.filters import scharr_h, scharr_v, gaussian
-
 
 class CLTimmBarth:
 

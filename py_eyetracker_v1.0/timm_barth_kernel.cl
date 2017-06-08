@@ -33,7 +33,6 @@ __kernel void timm_and_barth(
                     float displac_x = (float)(point_x - center_x);
                     float displac_y = (float)(point_y - center_y);
                     float displac_norm = sqrt(displac_x * displac_x + displac_y * displac_y) + 0.00001;
-
                     if (displac_norm > local_radius) {continue;}
 
                     displac_x = displac_x / displac_norm;

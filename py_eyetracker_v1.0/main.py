@@ -143,7 +143,7 @@ def live(cli):
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
-        picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo, debug=False)
+        picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo, debug=cli.debug)
 
         plt.cla()
         ax.imshow(picture, cmap="gray")
