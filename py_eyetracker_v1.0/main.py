@@ -72,7 +72,7 @@ def process_frame(image_cv2format, algo, debug=False):
     picture_float = img_as_float(image_cv2format)
     #picture = exposure.equalize_hist(picture_float)
     picture = picture_float
-    eyes = find_eyes(image_cv2format, cli.cascade_file)
+    eyes = find_eyes(cv2.equalizeHist(image_cv2format), cli.cascade_file)
     if len(eyes) < 2:
         return picture, None, None
 
