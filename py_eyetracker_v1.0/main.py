@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage import img_as_float
 
-from classes import Eye
 from utils.camera import WebcamVideoStream
-from utils.eyecenter.timm.timm_and_barth import find_eye_center_and_corners_cl as find_eye_center_and_corners_tb
-from utils.eyecenter.timm.timm_and_barth import context as opencl_context
+from utils.eye_area import detect_haar_cascade, split_eyes, eye_regions_from_face
 from utils.eyecenter.py_eyecenter import find_eye_center_and_corners_hough
+from utils.eyecenter.timm.timm_and_barth import context as opencl_context
+from utils.eyecenter.timm.timm_and_barth import find_eye_center_and_corners_cl as find_eye_center_and_corners_tb
 
 camera_port = 0
 
@@ -18,26 +18,6 @@ algos = {
     "hough": find_eye_center_and_corners_hough,
     "timm": find_eye_center_and_corners_tb
 }
-
-
-def find_eyes(image, cascPath):
-    """
-    Uses an OpenCV haar cascade to locate the rectangles of the image in which
-    each eye resides
-    :param imagePath: file path of the image
-    :return: list of lists representing the eye recangles [x, y, width, height]
-    """
-    cascade = cv2.CascadeClassifier(cascPath)
-
-    # Detect faces in the image
-    eyes = cascade.detectMultiScale(
-        image,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(30, 30),
-        flags = cv2.CASCADE_SCALE_IMAGE
-    )
-    return eyes
 
 
 def cropped_rect(image, rect):
@@ -51,57 +31,34 @@ def cropped_rect(image, rect):
     return np.copy(image[y1:y1+height,x1:x1+width])
 
 
-def split_eyes(eyes):
-    """
-    Select right eye and left eyes.
-    The criteria is simple: the right eye is always the one with smaller x
-    :param eyes: list of rectangles representing the eyes
-    :return: tuple (right_eye, left_eye) of Eye class
-    """
-    right_eye = eyes[0]
-    left_eye = eyes[1]
-
-    if right_eye[0] > left_eye[0]:
-        right_eye, left_eye = left_eye, right_eye
-
-    return Eye(right_eye, True), Eye(left_eye, False)
-
-
-def process_frame(image_cv2format, algo, debug=False):
+def process_frame(image_cv2format, algo, debug=False, debug_axes=(None, None)):
     find_eye_center_and_corners = algos[algo]
     picture_float = img_as_float(image_cv2format)
-    #picture = exposure.equalize_hist(picture_float)
+    image_cv2format_equalized = cv2.equalizeHist(image_cv2format)
     picture = picture_float
-    eyes = find_eyes(cv2.equalizeHist(image_cv2format), cli.cascade_file)
-    if len(eyes) < 2:
-        return picture, None, None
+    eyes = detect_haar_cascade(image_cv2format_equalized, cli.eye_cascade_file)
+    if len(eyes) < 2:  # if eyes not found, try without the equalization
+        eyes = detect_haar_cascade(image_cv2format, cli.eye_cascade_file)
+        if len(eyes) < 2:  # if eyes not found again, try just detecting the face
+            face = detect_haar_cascade(image_cv2format_equalized, cli.face_cascade_file)
+            if len(face) < 1:  # give up
+                return img_as_float(image_cv2format_equalized), None, None
+            else:
+                eyes = eye_regions_from_face(face[0])  # TODO: use the most central face in case many faces are detected
 
     right_eye, left_eye = split_eyes(eyes)
 
-    left_eyepatch = cropped_rect(picture, left_eye.area)
-    find_eye_center_and_corners(left_eyepatch, left_eye, debug=debug)
-
     right_eyepatch = cropped_rect(picture, right_eye.area)
-    find_eye_center_and_corners(right_eyepatch, right_eye, debug=debug)
+    find_eye_center_and_corners(right_eyepatch, right_eye, debug=debug, debug_ax=debug_axes[1])
 
-    return picture, right_eye, left_eye
+    left_eyepatch = cropped_rect(picture, left_eye.area)
+    find_eye_center_and_corners(left_eyepatch, left_eye, debug=debug, debug_ax=debug_axes[0])
+
+    return img_as_float(image_cv2format_equalized), right_eye, left_eye
 
 
-def one_shot(cli):
-    image_cv2 = cv2.imread(cli.file)
-    #image_hsv = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2HSV)
-    #(channel_h, channel_s, channel_v) = cv2.split(image_hsv)
-    image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_RGB2GRAY)
-
-    picture, right_eye, left_eye  = process_frame(image_cv2_gray, cli.algo, debug=cli.debug)
-
-    print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
-
-    # draw stuff
-    fig, ax = plt.subplots(1)
-
+def draw_routine(ax, picture, right_eye, left_eye):
     ax.imshow(picture, cmap="gray")
-
     if right_eye is not None and left_eye is not None:
         # draw eye regions (found using the haar cascade)
         ax.add_patch(patches.Rectangle(
@@ -126,6 +83,21 @@ def one_shot(cli):
         ax.plot(right_eye.outer_corner[0], right_eye.outer_corner[1], "b+")
         ax.plot(left_eye.outer_corner[0], left_eye.outer_corner[1], "b+")
 
+
+def one_shot(cli):
+    image_cv2 = cv2.imread(cli.file)
+    image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_RGB2GRAY)
+
+    fig, ax_img = plt.subplots(1)
+    (ax_righteye, ax_lefteye) = (None, None)
+    if cli.debug:
+        fig2, (ax_lefteye, ax_righteye) = plt.subplots(1,2)
+
+    picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo,
+                                                 debug=cli.debug, debug_axes=(ax_righteye, ax_lefteye))
+    print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
+
+    draw_routine(ax_img, picture, right_eye, left_eye)
     plt.show()
 
 
@@ -137,39 +109,24 @@ def live(cli):
                                )
     camera.start()
     plt.ion()
-    fig, ax = plt.subplots(1)
+    fig, ax_img = plt.subplots(1)
+    (ax_righteye, ax_lefteye) = (None, None)
+    if cli.debug:
+        fig2, (ax_lefteye, ax_righteye) = plt.subplots(1, 2)
 
     while plt.fignum_exists(1):
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
-        picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo, debug=cli.debug)
+        ax_img.clear()
+        if ax_righteye is not None:
+            ax_righteye.clear()
+            ax_lefteye.clear()
 
-        plt.cla()
-        ax.imshow(picture, cmap="gray")
-        if right_eye is not None and left_eye is not None:
-            # draw eye regions (found using the haar cascade)
-            ax.add_patch(patches.Rectangle(
-                (right_eye.area.x, right_eye.area.y),
-                right_eye.area.width,
-                right_eye.area.height,
-                linewidth=1, edgecolor='r', facecolor='none'
-            ))
-            ax.add_patch(patches.Rectangle(
-                (left_eye.area.x, left_eye.area.y),
-                left_eye.area.width,
-                left_eye.area.height,
-                linewidth=1, edgecolor='r', facecolor='none'
-            ))
-            # draw pupil spots (red)
-            ax.plot(right_eye.pupil[0], right_eye.pupil[1], "r+")
-            ax.plot(left_eye.pupil[0], left_eye.pupil[1], "r+")
-            # draw inner corners (green)
-            ax.plot(right_eye.inner_corner[0], right_eye.inner_corner[1], "g+")
-            ax.plot(left_eye.inner_corner[0], left_eye.inner_corner[1], "g+")
-            # draw outer corners (blue)
-            ax.plot(right_eye.outer_corner[0], right_eye.outer_corner[1], "b+")
-            ax.plot(left_eye.outer_corner[0], left_eye.outer_corner[1], "b+")
+        picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo,
+                                                     debug=cli.debug, debug_axes=(ax_righteye, ax_lefteye))
+
+        draw_routine(ax_img, picture, right_eye, left_eye)
         plt.pause(0.1)
 
     camera.stop()
@@ -187,8 +144,10 @@ def main(cli):
 def parsecli():
     parser = argparse.ArgumentParser(description="Find eyes and eye-centers from an image")
     parser.add_argument('file', help='filename of the picture; - for webcam', type=str)
-    parser.add_argument('-c', '--cascade-file', help='path to the .xml file with the eye-detection haar cascade',
-                        type=str, default="haarcascade_righteye_2splits.xml")
+    parser.add_argument('-e', '--eye-cascade-file', help='path to the .xml file with the eye-detection haar cascade',
+                        type=str, default="../haarcascades/haarcascade_righteye_2splits.xml")
+    parser.add_argument('-f', '--face-cascade-file', help='path to the .xml file with the face-detection haar cascade',
+                        type=str, default="../haarcascades/haarcascade_frontalface_default.xml")
     parser.add_argument('--saturation', help='override the webcam default saturation setting (value [0.0, 1.0])',
                         type=str, default="None")
     parser.add_argument('--contrast', help='override the webcam default contrast setting (value [0.0, 1.0])',

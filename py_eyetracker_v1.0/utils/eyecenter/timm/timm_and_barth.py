@@ -5,6 +5,7 @@ from skimage import exposure
 from skimage.feature import peak_local_max
 from skimage.filters import scharr_h, scharr_v, gaussian
 from skimage.transform import resize
+from skimage.segmentation import clear_border
 
 from classes import Point
 from utils.eyecenter.timm.cl_runner import CLTimmBarth
@@ -40,7 +41,7 @@ def precomputation(eye_image):
 context = CLTimmBarth(precomputation=precomputation)
 
 
-def find_eye_center_and_corners_cl(eye_image, eye_object, debug=False, locality=0.15):  # locality=0.15
+def find_eye_center_and_corners_cl(eye_image, eye_object, locality=0.15, debug=False, debug_ax=None):  # locality=0.15
 
     # scale the image if needed
     width, height = np.shape(eye_image)
@@ -56,23 +57,38 @@ def find_eye_center_and_corners_cl(eye_image, eye_object, debug=False, locality=
     width, height = np.shape(eye_image)
     # run the actual timm & barth filter
     tb_image = context.compute(eye_image, locality=width * locality)
-    # find the local peaks in the function
-    maxima = peak_local_max(tb_image, min_distance=10)
 
+    mask = tb_image > np.mean(tb_image)
+    #mask_clear_border = clear_border(mask)
+    mask_clear_border = mask
+    tb_image = tb_image * mask_clear_border
+
+    # find the local peaks in the function
+    maxima = peak_local_max(tb_image, min_distance=int(width * locality))
+    # in our imperfect world, we must also check that the peaks reside within the bounds of the image
+    def is_in_bounds(point):
+        y, x = point
+        return x > 0 and x < width and y > 0 and y < height
+    maxima = list(filter(is_in_bounds, maxima))
+    if len(maxima) == 0:
+        return
     # select the actual center among the candidates
-    def center_euristic(point):  # point must be central, and have a strong t&b value
+    def center_euristic(point):
         y,x = point
+        # objective function must have a high value; point must be central; low point are preferred
         return 5 * tb_image[x, y] + \
-               -1 * sqrt((x - (width / 2)) ** 2 + (y - (height / 2)) ** 2)
+               -1 * sqrt((x - (width / 2)) ** 2 + (y - (height / 2)) ** 2) + \
+               y * 0.1
     true_center = max(maxima, key=center_euristic)
 
     eye_object.pupil_relative = Point(true_center[1] * scale_factor, true_center[0] * scale_factor)
 
     if debug:
-        fig, ax = plt.subplots(1)
+        if debug_ax is None:
+            fig, debug_ax = plt.subplots(1)
         plt.title("right eye" if eye_object.is_right else "left eye")
-        ax.imshow(tb_image, cmap="gray")
+        debug_ax.imshow(tb_image, cmap="gray")
         for point in maxima:
-            ax.plot(point[1], point[0], "b+")
-        ax.plot(true_center[1], true_center[0], "r+")
+            debug_ax.plot(point[1], point[0], "b+")
+        debug_ax.plot(true_center[1], true_center[0], "r+")
 

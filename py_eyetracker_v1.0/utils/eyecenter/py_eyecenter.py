@@ -2,19 +2,21 @@ from skimage import measure
 import numpy as np
 from skimage.transform import hough_circle, hough_circle_peaks
 from skimage.feature import corner_harris, corner_peaks
+from skimage.filters import threshold_otsu
 import matplotlib.pyplot as plt
+from skimage import exposure
 
 from classes import Eye, Point
 
 
-def find_eye_center_and_corners_hough(eye_image, eye_object, debug=False):
+def find_eye_center_and_corners_hough(eye_image, eye_object, debug=False, debug_ax=None):
     assert(isinstance(eye_object, Eye))
 
     # Part 1: finding the center of the eye
 
+    eye_image = exposure.equalize_hist(eye_image)
     # apply a threshold to the image
-    #thresh = threshold_otsu(eye_image) * 0.3
-    thresh = 0.029
+    thresh = threshold_otsu(eye_image) * 0.3
     eye_binary = eye_image < thresh
 
     # split the thresholded image into regions
@@ -77,18 +79,19 @@ def find_eye_center_and_corners_hough(eye_image, eye_object, debug=False):
     right_corner = max(right_corner_score, key=lambda cs: cs[1])[0]
 
     if debug:
-        fig, ax = plt.subplots(1)
+        if debug_ax is None:
+            fig, debug_ax = plt.subplots(1)
 
         plt.title("right eye" if eye_object.is_right else "left eye")
-        ax.imshow(eye_binary, cmap="gray")
+        debug_ax.imshow(eye_binary, cmap="gray")
 
-        ax.imshow(blobs_labels, cmap='spectral')
-        ax.plot(center_x, center_y, "w+")
+        debug_ax.imshow(blobs_labels, cmap='spectral')
+        debug_ax.plot(center_x, center_y, "w+")
 
-        ax.plot(corners[:,1], corners[:,0], "bo")
+        debug_ax.plot(corners[:,1], corners[:,0], "bo")
 
-        ax.plot(left_corner[1], left_corner[0], "ro")
-        ax.plot(right_corner[1], right_corner[0], "go")
+        debug_ax.plot(left_corner[1], left_corner[0], "ro")
+        debug_ax.plot(right_corner[1], right_corner[0], "go")
 
     eye_object.pupil_relative = Point(center_x, center_y)
     eye_object.set_leftmost_corner(Point(x=left_corner[1], y=left_corner[0]))
