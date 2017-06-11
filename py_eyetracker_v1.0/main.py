@@ -1,6 +1,8 @@
 import argparse
 
 import cv2
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,15 +10,14 @@ from skimage import img_as_float
 
 from utils.camera import WebcamVideoStream
 from utils.eye_area import detect_haar_cascade, split_eyes, eye_regions_from_face
-from utils.eyecenter.py_eyecenter import find_eye_center_and_corners_hough
-from utils.eyecenter.timm.timm_and_barth import context as opencl_context
-from utils.eyecenter.timm.timm_and_barth import find_eye_center_and_corners_cl as find_eye_center_and_corners_tb
+from utils.eyecenter.py_eyecenter import PyHoughEyecenter
+from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
 
 camera_port = 0
 
 algos = {
-    "hough": find_eye_center_and_corners_hough,
-    "timm": find_eye_center_and_corners_tb
+    "hough": PyHoughEyecenter,
+    "timm": TimmAndBarth
 }
 
 
@@ -31,8 +32,7 @@ def cropped_rect(image, rect):
     return np.copy(image[y1:y1+height,x1:x1+width])
 
 
-def process_frame(image_cv2format, algo, debug=False, debug_axes=(None, None)):
-    find_eye_center_and_corners = algos[algo]
+def process_frame(image_cv2format, algo):
     picture_float = img_as_float(image_cv2format)
     image_cv2format_equalized = cv2.equalizeHist(image_cv2format)
     picture = picture_float
@@ -49,10 +49,10 @@ def process_frame(image_cv2format, algo, debug=False, debug_axes=(None, None)):
     right_eye, left_eye = split_eyes(eyes)
 
     right_eyepatch = cropped_rect(picture, right_eye.area)
-    find_eye_center_and_corners(right_eyepatch, right_eye, debug=debug, debug_ax=debug_axes[1])
+    algo.detect_eye_features(right_eyepatch, right_eye)
 
     left_eyepatch = cropped_rect(picture, left_eye.area)
-    find_eye_center_and_corners(left_eyepatch, left_eye, debug=debug, debug_ax=debug_axes[0])
+    algo.detect_eye_features(left_eyepatch, left_eye)
 
     return img_as_float(image_cv2format_equalized), right_eye, left_eye
 
@@ -84,24 +84,24 @@ def draw_routine(ax, picture, right_eye, left_eye):
         ax.plot(left_eye.outer_corner[0], left_eye.outer_corner[1], "b+")
 
 
-def one_shot(cli):
+def one_shot(cli, algo):
     image_cv2 = cv2.imread(cli.file)
     image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_RGB2GRAY)
 
     fig, ax_img = plt.subplots(1)
-    (ax_righteye, ax_lefteye) = (None, None)
     if cli.debug:
-        fig2, (ax_lefteye, ax_righteye) = plt.subplots(1,2)
+        fig2, axes_2 = algo.create_debug_figure()
+        algo.setup_debug_parameters(True, axes_2)
 
-    picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo,
-                                                 debug=cli.debug, debug_axes=(ax_righteye, ax_lefteye))
+    picture, right_eye, left_eye = process_frame(image_cv2_gray, algo)
+
     print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
 
     draw_routine(ax_img, picture, right_eye, left_eye)
     plt.show()
 
 
-def live(cli):
+def live(cli, algo):
     camera = WebcamVideoStream(src=camera_port,
                                debug=cli.debug,
                                contrast=None if cli.contrast == "None" else float(cli.contrast),
@@ -110,21 +110,18 @@ def live(cli):
     camera.start()
     plt.ion()
     fig, ax_img = plt.subplots(1)
-    (ax_righteye, ax_lefteye) = (None, None)
     if cli.debug:
-        fig2, (ax_lefteye, ax_righteye) = plt.subplots(1, 2)
+        fig2, axes_2 = algo.create_debug_figure()
+        algo.setup_debug_parameters(True, axes_2)
 
     while plt.fignum_exists(1):
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
         ax_img.clear()
-        if ax_righteye is not None:
-            ax_righteye.clear()
-            ax_lefteye.clear()
+        algo.clean_debug_axes()
 
-        picture, right_eye, left_eye = process_frame(image_cv2_gray, cli.algo,
-                                                     debug=cli.debug, debug_axes=(ax_righteye, ax_lefteye))
+        picture, right_eye, left_eye = process_frame(image_cv2_gray, algo)
 
         draw_routine(ax_img, picture, right_eye, left_eye)
         plt.pause(0.1)
@@ -133,12 +130,14 @@ def live(cli):
 
 
 def main(cli):
+    algo = algos[cli.algo]()
     if cli.algo == "timm":
-        opencl_context.load_program(cli.program_timm)
+        algo.context.load_program(cli.program_timm)
+
     if cli.file == "-":
-        live(cli)
+        live(cli, algo)
     else:
-        one_shot(cli)
+        one_shot(cli, algo)
 
 
 def parsecli():

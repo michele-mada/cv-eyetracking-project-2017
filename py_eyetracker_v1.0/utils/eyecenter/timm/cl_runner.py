@@ -3,6 +3,9 @@ import numpy as np
 
 
 class CLTimmBarth:
+    """
+    Just a wrapper around all the opencl boilerplate code
+    """
 
     def __init__(self, precomputation=lambda i: i):
         self.precomputation = precomputation
