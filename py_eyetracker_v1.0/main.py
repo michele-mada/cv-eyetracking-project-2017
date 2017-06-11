@@ -33,16 +33,22 @@ def cropped_rect(image, rect):
 
 
 def process_frame(image_cv2format, algo):
+    # pre-processing
     picture_float = img_as_float(image_cv2format)
     image_cv2format_equalized = cv2.equalizeHist(image_cv2format)
     picture = picture_float
+
+    detect_attempt = "equalized"
     eyes = detect_haar_cascade(image_cv2format_equalized, cli.eye_cascade_file)
     if len(eyes) < 2:  # if eyes not found, try without the equalization
+        detect_attempt = "raw"
         eyes = detect_haar_cascade(image_cv2format, cli.eye_cascade_file)
         if len(eyes) < 2:  # if eyes not found again, try just detecting the face
+            detect_attempt = "geometric"
             face = detect_haar_cascade(image_cv2format_equalized, cli.face_cascade_file)
             if len(face) < 1:  # give up
-                return img_as_float(image_cv2format_equalized), None, None
+                detect_attempt = "gave up"
+                return img_as_float(image_cv2format_equalized), None, None, detect_attempt
             else:
                 eyes = eye_regions_from_face(face[0])  # TODO: use the most central face in case many faces are detected
 
@@ -54,7 +60,7 @@ def process_frame(image_cv2format, algo):
     left_eyepatch = cropped_rect(picture, left_eye.area)
     algo.detect_eye_features(left_eyepatch, left_eye)
 
-    return img_as_float(image_cv2format_equalized), right_eye, left_eye
+    return img_as_float(image_cv2format_equalized), right_eye, left_eye, detect_attempt
 
 
 def draw_routine(ax, picture, right_eye, left_eye):
@@ -93,10 +99,12 @@ def one_shot(cli, algo):
         fig2, axes_2 = algo.create_debug_figure()
         algo.setup_debug_parameters(True, axes_2)
 
-    picture, right_eye, left_eye = process_frame(image_cv2_gray, algo)
+    picture, right_eye, left_eye, detect_string = process_frame(image_cv2_gray, algo)
 
+    print("Eye detection successful (%s)" % detect_string)
     print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
 
+    ax_img.set_title("eye detect (%s)" % detect_string)
     draw_routine(ax_img, picture, right_eye, left_eye)
     plt.show()
 
@@ -121,8 +129,9 @@ def live(cli, algo):
         ax_img.clear()
         algo.clean_debug_axes()
 
-        picture, right_eye, left_eye = process_frame(image_cv2_gray, algo)
+        picture, right_eye, left_eye, detect_string = process_frame(image_cv2_gray, algo)
 
+        ax_img.set_title("eye detect (%s)" % detect_string)
         draw_routine(ax_img, picture, right_eye, left_eye)
         plt.pause(0.1)
 
