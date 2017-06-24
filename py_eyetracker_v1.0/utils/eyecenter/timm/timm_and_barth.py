@@ -66,8 +66,9 @@ class TimmAndBarth(EyeFeaturesExtractor):
             eye_image = resize(eye_image, (max_w, max_h))
 
         # important: histogram equalization
-        eye_image = exposure.equalize_hist(eye_image)
-        eye_image = gaussian(eye_image)
+        if self.equalization == exposure.equalize_hist:
+            eye_image = exposure.equalize_hist(eye_image)
+        #eye_image = gaussian(eye_image)
         width, height = np.shape(eye_image)
         # run the actual timm & barth filter
         tb_image = self.context.compute(eye_image, locality=int(width * self.locality_factor))

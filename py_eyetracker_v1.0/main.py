@@ -6,18 +6,23 @@ matplotlib.use('TkAgg')
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage import img_as_float
+from skimage import img_as_float, img_as_ubyte, exposure
 
 from utils.camera import WebcamVideoStream
 from utils.eye_area import detect_haar_cascade, split_eyes, eye_regions_from_face
 from utils.eyecenter.py_eyecenter import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
+from utils.histogram.lsh_equalization import lsh_equalization
 
 camera_port = 0
 
 algos = {
     "hough": PyHoughEyecenter,
     "timm": TimmAndBarth
+}
+equaliz = {
+    "h": exposure.equalize_hist,
+    "lsh": lsh_equalization,
 }
 
 
@@ -35,8 +40,9 @@ def cropped_rect(image, rect):
 def process_frame(image_cv2format, algo):
     # pre-processing
     picture_float = img_as_float(image_cv2format)
-    image_cv2format_equalized = cv2.equalizeHist(image_cv2format)
-    picture = picture_float
+    picture_float_equalized = algo.equalization(picture_float)
+    image_cv2format_equalized = img_as_ubyte(picture_float_equalized)
+    picture = picture_float_equalized
 
     detect_attempt = "equalized"
     eyes = detect_haar_cascade(image_cv2format_equalized, cli.eye_cascade_file)
@@ -60,7 +66,7 @@ def process_frame(image_cv2format, algo):
     left_eyepatch = cropped_rect(picture, left_eye.area)
     algo.detect_eye_features(left_eyepatch, left_eye)
 
-    return img_as_float(image_cv2format_equalized), right_eye, left_eye, detect_attempt
+    return picture, right_eye, left_eye, detect_attempt
 
 
 def draw_routine(ax, picture, right_eye, left_eye):
@@ -140,6 +146,8 @@ def live(cli, algo):
 
 def main(cli):
     algo = algos[cli.algo]()
+    algo.equalization = equaliz[cli.equalization]
+
     if cli.algo == "timm":
         algo.context.load_program(cli.program_timm)
 
@@ -152,9 +160,9 @@ def main(cli):
 def parsecli():
     parser = argparse.ArgumentParser(description="Find eyes and eye-centers from an image")
     parser.add_argument('file', help='filename of the picture; - for webcam', type=str)
-    parser.add_argument('-e', '--eye-cascade-file', help='path to the .xml file with the eye-detection haar cascade',
+    parser.add_argument('--eye-cascade-file', help='path to the .xml file with the eye-detection haar cascade',
                         type=str, default="../haarcascades/haarcascade_righteye_2splits.xml")
-    parser.add_argument('-f', '--face-cascade-file', help='path to the .xml file with the face-detection haar cascade',
+    parser.add_argument('--face-cascade-file', help='path to the .xml file with the face-detection haar cascade',
                         type=str, default="../haarcascades/haarcascade_frontalface_default.xml")
     parser.add_argument('--saturation', help='override the webcam default saturation setting (value [0.0, 1.0])',
                         type=str, default="None")
@@ -163,7 +171,9 @@ def parsecli():
     parser.add_argument('-a','--algo', help='algorithm to use (hough or timm)(default to timm)',
                         type=str, default="timm")
     parser.add_argument('-p', '--program-timm', help='path to the opencl kernel implementing timm and barth algorithm',
-                        type=str, default="timm_barth_kernel.cl")
+                        type=str, default="cl_kernels/timm_barth_kernel.cl")
+    parser.add_argument('-e', '--equalization', help='type of histogram equalization to use',
+                        type=str, default="h", choices=["h", "lsh"])
     parser.add_argument('-d','--debug', help='enable debug mode', action='store_true')
     return parser.parse_args()
 

@@ -5,6 +5,7 @@ class EyeFeaturesExtractor:
     def __init__(self):
         self.debug_mode = False
         self.debug_axes = None
+        self.equalization = None
 
     def create_debug_figure(self):
         return None, None

@@ -12,7 +12,7 @@ class CLTimmBarth:
         self.context = cl.create_some_context()
         self.queue = cl.CommandQueue(self.context)
 
-    def load_program(self, program_path="timm_barth_kernel.cl"):
+    def load_program(self, program_path="cl_kernels/timm_barth_kernel.cl"):
         with open(program_path, "r") as fp:
             self.program = cl.Program(self.context, fp.read()).build()
 
