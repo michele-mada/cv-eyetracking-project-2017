@@ -1,4 +1,6 @@
 import argparse
+from math import sqrt
+import sys
 
 import cv2
 import matplotlib
@@ -13,6 +15,9 @@ from utils.eye_area import detect_haar_cascade, split_eyes, eye_regions_from_fac
 from utils.eyecenter.py_eyecenter import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
 from utils.histogram.lsh_equalization import lsh_equalization
+
+from utils.bioID import BioIDFaceDatabase
+
 
 camera_port = 0
 
@@ -115,6 +120,48 @@ def one_shot(cli, algo):
     plt.show()
 
 
+def test_run(cli, algo):
+    accuracy_tiers = [
+        [0.25, "distance eye center-corner", 0],
+        [0.10, "iris diameter", 0],
+        [0.05, "pupil diameter", 0],
+    ]
+
+    def distance(expected, detected):
+        return sqrt((detected.pupil.x - expected.x)**2 +
+                    (detected.pupil.y - expected.y)**2)
+
+    def error_estimate(face, detect_righteye, detect_lefteye):
+        return max(distance(face.left_eye, detect_lefteye),
+                   distance(face.right_eye, detect_righteye)) / face.eye_center_distance
+
+    total_error = 0.0
+
+    facedb = BioIDFaceDatabase(cli.bioid_folder)
+    if len(facedb.faces) == 0:
+        print("Error: bioid face database not found at \"%s\"" % cli.bioid_folder)
+        sys.exit(-1)
+    print("Testing against %d faces" % len(facedb.faces))
+    for n, face in enumerate(facedb.faces):
+        picture, right_eye, left_eye, detect_string = process_frame(face.load_cv2(), algo)
+        if right_eye is None or left_eye is None:
+            e = 1.0
+        else:
+            e = error_estimate(face, right_eye, left_eye)
+        total_error += e
+        for i in range(len(accuracy_tiers)):
+            if e <= accuracy_tiers[i][0]:
+                accuracy_tiers[i][2] += 1
+        print("testing: done %.2f%%" % ((float(n)*100) / float(len(facedb.faces)),), end="\r")
+
+    total_error /= len(facedb.faces)
+    print("Test results:                   ")
+    print("Average error: %f" % total_error)
+    print("Accuracy (tiered):")
+    for tier in accuracy_tiers:
+        print("    e <= %.2f (%s): %.2f" % (tier[0],tier[1], float(tier[2]) / len(facedb.faces)))
+
+
 def live(cli, algo):
     camera = WebcamVideoStream(src=camera_port,
                                debug=cli.debug,
@@ -153,13 +200,15 @@ def main(cli):
 
     if cli.file == "-":
         live(cli, algo)
+    elif cli.file == "test":
+        test_run(cli, algo)
     else:
         one_shot(cli, algo)
 
 
 def parsecli():
     parser = argparse.ArgumentParser(description="Find eyes and eye-centers from an image")
-    parser.add_argument('file', help='filename of the picture; - for webcam', type=str)
+    parser.add_argument('file', help='filename of the picture; - for webcam; \"test\" to run a performance test', type=str)
     parser.add_argument('--eye-cascade-file', help='path to the .xml file with the eye-detection haar cascade',
                         type=str, default="../haarcascades/haarcascade_righteye_2splits.xml")
     parser.add_argument('--face-cascade-file', help='path to the .xml file with the face-detection haar cascade',
@@ -168,13 +217,15 @@ def parsecli():
                         type=str, default="None")
     parser.add_argument('--contrast', help='override the webcam default contrast setting (value [0.0, 1.0])',
                         type=str, default="None")
-    parser.add_argument('-a','--algo', help='algorithm to use (hough or timm)(default to timm)',
-                        type=str, default="timm")
+    parser.add_argument('-a','--algo', help='pupil center algorithm to use',
+                        type=str, default="timm", choices=["hough", "timm"])
     parser.add_argument('-p', '--program-timm', help='path to the opencl kernel implementing timm and barth algorithm',
                         type=str, default="cl_kernels/timm_barth_kernel.cl")
     parser.add_argument('-e', '--equalization', help='type of histogram equalization to use',
                         type=str, default="h", choices=["h", "lsh"])
     parser.add_argument('-d','--debug', help='enable debug mode', action='store_true')
+    parser.add_argument('--bioid-folder', metavar='bioID folder', help='BioID face database folder',
+                        type=str, default="../../BioID-FaceDatabase-V1.2")
     return parser.parse_args()
 
 

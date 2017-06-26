@@ -109,7 +109,7 @@ class TimmAndBarth(EyeFeaturesExtractor):
                    y * 0.1
         true_center = max(maxima, key=center_euristic)
 
-        eye_object.pupil_relative = Point(true_center[1] * scale_factor, true_center[0] * scale_factor)
+        eye_object.pupil_relative = Point(int(true_center[1] * scale_factor), int(true_center[0] * scale_factor))
 
         if self.debug_mode:
             for point in maxima:
