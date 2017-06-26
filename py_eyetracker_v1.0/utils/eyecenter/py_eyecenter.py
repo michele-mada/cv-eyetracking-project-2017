@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from skimage import exposure
 
 from classes import Eye, Point
+from utils.eyecorners import find_eye_corners
 from utils.eyecenter.interface import EyeFeaturesExtractor
 
 
@@ -62,32 +63,9 @@ class PyHoughEyecenter(EyeFeaturesExtractor):
         except ValueError:
             return
 
-        # Part 1: finding the corners of the eye
+        # Part 2: finding the corners of the eye
 
-        # heuristic to find the best corner, given its position relative to the pupil center
-        def corner_measure(corner, center, leftness=1):
-            cy, cx = corner
-            zx, zy = center
-            return (cx-zx) * leftness - 1.5 * abs(cy-zy)
-
-        # find the centers (y,x) of the corners, using harris
-        corners = corner_peaks(corner_harris(eye_binary))
-
-        # give each corner a score, according to our heuristic
-        left_corner_score = map(lambda corner: (corner,
-                                                corner_measure(corner, (center_x, center_y), leftness=1)
-                                                ),
-                                corners)
-        # find the best corner
-        left_corner = max(left_corner_score, key=lambda cs: cs[1])[0]
-
-        # give each corner a score, according to our heuristic
-        right_corner_score = map(lambda corner: (corner,
-                                                 corner_measure(corner, (center_x, center_y), leftness=-1)
-                                                 ),
-                                 corners)
-        # find the best corner
-        right_corner = max(right_corner_score, key=lambda cs: cs[1])[0]
+        right_corner, left_corner, corners = find_eye_corners(eye_binary, (center_x, center_y))
 
         if self.debug_mode:
             debug_ax = self.debug_axes[0]

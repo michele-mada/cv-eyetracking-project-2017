@@ -30,19 +30,18 @@ def split_eyes(eyes):
     :param eyes: list of rectangles representing the eyes
     :return: tuple (right_eye, left_eye) of Eye class
     """
-    pairs = [(a, b) for a in eyes for b in eyes]
+    pairs = filter(lambda pair: pair[0] != pair[1], [(tuple(a), tuple(b)) for a in eyes for b in eyes])
 
     def evaluate_pair(pair):
         right_eye, left_eye = pair
         score = 0
-        if right_eye[0] < left_eye[0]:
+        if right_eye[0] < left_eye[0]:  # right eye must be on the right
             score += 100
-        if left_eye[0] > right_eye[0] + right_eye[2] * 1.5:
+        if left_eye[0] > right_eye[0] + right_eye[2] * 1.5:  # the distance must be right
             score += 50
-        if abs(left_eye[1] - right_eye[1]) < left_eye[3]:
-            score += 40
-        if abs(left_eye[1] - right_eye[1]) < right_eye[3]:
-            score += 40
+        score -= abs(left_eye[1] - right_eye[1]) * 5  # eyes must be aligned
+        if left_eye == right_eye:  # eyes must not be the exact same region
+            score -= 100
         return score
 
     true_pair = max(pairs, key=evaluate_pair)

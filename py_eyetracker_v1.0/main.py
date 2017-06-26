@@ -1,17 +1,18 @@
 import argparse
-from math import sqrt
 import sys
+from math import sqrt
 
 import cv2
 import matplotlib
+
+from utils.process_frame import process_frame
+from utils.visualization import draw_routine
+
 matplotlib.use('TkAgg')
-import matplotlib.patches as patches
 import matplotlib.pyplot as plt
-import numpy as np
-from skimage import img_as_float, img_as_ubyte, exposure
+from skimage import exposure
 
 from utils.camera import WebcamVideoStream
-from utils.eye_area import detect_haar_cascade, split_eyes, eye_regions_from_face
 from utils.eyecenter.py_eyecenter import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
 from utils.histogram.lsh_equalization import lsh_equalization
@@ -31,74 +32,11 @@ equaliz = {
 }
 
 
-def cropped_rect(image, rect):
-    """
-    Crops an image represented by a 2d numpy array
-    :param image: numpy 2d array
-    :param rect: list or tuple of four elements: x,y,width,height
-    :return: numpy 2d array containing the cropped region
-    """
-    (x1, y1, width, height) = rect
-    return np.copy(image[y1:y1+height,x1:x1+width])
-
-
-def process_frame(image_cv2format, algo):
-    # pre-processing
-    picture_float = img_as_float(image_cv2format)
-    picture_float_equalized = algo.equalization(picture_float)
-    image_cv2format_equalized = img_as_ubyte(picture_float_equalized)
-    picture = picture_float_equalized
-
-    detect_attempt = "equalized"
-    eyes = detect_haar_cascade(image_cv2format_equalized, cli.eye_cascade_file)
-    if len(eyes) < 2:  # if eyes not found, try without the equalization
-        detect_attempt = "raw"
-        eyes = detect_haar_cascade(image_cv2format, cli.eye_cascade_file)
-        if len(eyes) < 2:  # if eyes not found again, try just detecting the face
-            detect_attempt = "geometric"
-            face = detect_haar_cascade(image_cv2format_equalized, cli.face_cascade_file)
-            if len(face) < 1:  # give up
-                detect_attempt = "gave up"
-                return img_as_float(image_cv2format_equalized), None, None, detect_attempt
-            else:
-                eyes = eye_regions_from_face(face[0])  # TODO: use the most central face in case many faces are detected
-
-    right_eye, left_eye = split_eyes(eyes)
-
-    right_eyepatch = cropped_rect(picture, right_eye.area)
-    algo.detect_eye_features(right_eyepatch, right_eye)
-
-    left_eyepatch = cropped_rect(picture, left_eye.area)
-    algo.detect_eye_features(left_eyepatch, left_eye)
-
-    return picture, right_eye, left_eye, detect_attempt
-
-
-def draw_routine(ax, picture, right_eye, left_eye):
-    ax.imshow(picture, cmap="gray")
-    if right_eye is not None and left_eye is not None:
-        # draw eye regions (found using the haar cascade)
-        ax.add_patch(patches.Rectangle(
-            (right_eye.area.x, right_eye.area.y),
-            right_eye.area.width,
-            right_eye.area.height,
-            linewidth=1, edgecolor='r', facecolor='none'
-        ))
-        ax.add_patch(patches.Rectangle(
-            (left_eye.area.x, left_eye.area.y),
-            left_eye.area.width,
-            left_eye.area.height,
-            linewidth=1, edgecolor='r', facecolor='none'
-        ))
-        # draw pupil spots (red)
-        ax.plot(right_eye.pupil[0], right_eye.pupil[1], "r+")
-        ax.plot(left_eye.pupil[0], left_eye.pupil[1], "r+")
-        # draw inner corners (green)
-        ax.plot(right_eye.inner_corner[0], right_eye.inner_corner[1], "g+")
-        ax.plot(left_eye.inner_corner[0], left_eye.inner_corner[1], "g+")
-        # draw outer corners (blue)
-        ax.plot(right_eye.outer_corner[0], right_eye.outer_corner[1], "b+")
-        ax.plot(left_eye.outer_corner[0], left_eye.outer_corner[1], "b+")
+def get_cascade_files(cli):
+    return {
+        "eye": cli.eye_cascade_file,
+        "face": cli.face_cascade_file
+    }
 
 
 def one_shot(cli, algo):
@@ -110,17 +48,22 @@ def one_shot(cli, algo):
         fig2, axes_2 = algo.create_debug_figure()
         algo.setup_debug_parameters(True, axes_2)
 
-    picture, right_eye, left_eye, detect_string = process_frame(image_cv2_gray, algo)
+    cascade_files = get_cascade_files(cli)
+
+    picture, right_eye, left_eye, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
 
     print("Eye detection successful (%s)" % detect_string)
     print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
 
     ax_img.set_title("eye detect (%s)" % detect_string)
-    draw_routine(ax_img, picture, right_eye, left_eye)
+    draw_routine(ax_img, picture, right_eye, left_eye, not_eyes)
     plt.show()
 
 
 def test_run(cli, algo):
+    cascade_files = get_cascade_files(cli)
+
+    # define various accuracy metrics
     accuracy_tiers = [
         [0.25, "distance eye center-corner", 0],
         [0.10, "iris diameter", 0],
@@ -138,13 +81,16 @@ def test_run(cli, algo):
     total_error = 0.0
     missed_detections = 0
 
+    # initialize the BioID face database
     facedb = BioIDFaceDatabase(cli.bioid_folder)
     if len(facedb.faces) == 0:
         print("Error: bioid face database not found at \"%s\"" % cli.bioid_folder)
         sys.exit(-1)
+
+    # run the tests
     print("Testing against %d faces" % len(facedb.faces))
     for n, face in enumerate(facedb.faces):
-        picture, right_eye, left_eye, detect_string = process_frame(face.load_cv2(), algo)
+        picture, right_eye, left_eye, detect_string, not_eyes = process_frame(face.load_cv2(), algo, cascade_files)
         if right_eye is None or left_eye is None:
             missed_detections += 1
         else:
@@ -157,6 +103,8 @@ def test_run(cli, algo):
 
     total_detected = len(facedb.faces) - missed_detections
     total_error /= total_detected
+
+    # print the results
     print("Test results:                   ")
     print("Correct detections: %d out of %d (%.2f)" % (total_detected,
                                                        len(facedb.faces),
@@ -180,6 +128,8 @@ def live(cli, algo):
         fig2, axes_2 = algo.create_debug_figure()
         algo.setup_debug_parameters(True, axes_2)
 
+    cascade_files = get_cascade_files(cli)
+
     while plt.fignum_exists(1):
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
@@ -187,10 +137,10 @@ def live(cli, algo):
         ax_img.clear()
         algo.clean_debug_axes()
 
-        picture, right_eye, left_eye, detect_string = process_frame(image_cv2_gray, algo)
+        picture, right_eye, left_eye, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
 
         ax_img.set_title("eye detect (%s)" % detect_string)
-        draw_routine(ax_img, picture, right_eye, left_eye)
+        draw_routine(ax_img, picture, right_eye, left_eye, not_eyes)
         plt.pause(0.1)
 
     camera.stop()

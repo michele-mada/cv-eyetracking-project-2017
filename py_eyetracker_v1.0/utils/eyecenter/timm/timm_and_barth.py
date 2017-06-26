@@ -6,10 +6,12 @@ from skimage.feature import peak_local_max
 from skimage.filters import scharr_h, scharr_v, gaussian
 from skimage.transform import resize
 from skimage.segmentation import clear_border
+from skimage.filters import threshold_otsu
 
 from classes import Point
 from utils.eyecenter.interface import EyeFeaturesExtractor
 from utils.eyecenter.timm.cl_runner import CLTimmBarth
+from utils.eyecorners import find_eye_corners
 
 
 class TimmAndBarth(EyeFeaturesExtractor):
@@ -78,6 +80,9 @@ class TimmAndBarth(EyeFeaturesExtractor):
         #mask_clear_border = mask
         #tb_image = tb_image * mask_clear_border
 
+        thresh = threshold_otsu(eye_image)
+        eye_binary = eye_image < thresh
+
         (ax_1, ax_2, ax_3) = [None] * 3
         if self.debug_mode:
             (ax_1, ax_2, ax_3) = self.debug_axes[0:3]
@@ -108,10 +113,20 @@ class TimmAndBarth(EyeFeaturesExtractor):
                    -1 * sqrt((x - (width / 2)) ** 2 + (y - (height / 2)) ** 2) + \
                    y * 0.1
         true_center = max(maxima, key=center_euristic)
+        center_x = int(true_center[1] * scale_factor)
+        center_y = int(true_center[0] * scale_factor)
 
-        eye_object.pupil_relative = Point(int(true_center[1] * scale_factor), int(true_center[0] * scale_factor))
+        right_corner, left_corner, corners = find_eye_corners(eye_binary, (center_x, center_y))
+
+        eye_object.pupil_relative = Point(center_x, center_y)
+        eye_object.set_leftmost_corner(Point(x=left_corner[1], y=left_corner[0]))
+        eye_object.set_rightmost_corner(Point(x=right_corner[1], y=right_corner[0]))
 
         if self.debug_mode:
+            ax_1.plot(corners[:, 1], corners[:, 0], "b.")
+            ax_1.plot(left_corner[1], left_corner[0], "r.")
+            ax_1.plot(right_corner[1], right_corner[0], "g.")
+
             for point in maxima:
                 ax_3.plot(point[1], point[0], "b+")
             ax_3.plot(true_center[1], true_center[0], "r+")
