@@ -136,6 +136,7 @@ def test_run(cli, algo):
                    distance(face.right_eye, detect_righteye)) / face.eye_center_distance
 
     total_error = 0.0
+    missed_detections = 0
 
     facedb = BioIDFaceDatabase(cli.bioid_folder)
     if len(facedb.faces) == 0:
@@ -145,21 +146,25 @@ def test_run(cli, algo):
     for n, face in enumerate(facedb.faces):
         picture, right_eye, left_eye, detect_string = process_frame(face.load_cv2(), algo)
         if right_eye is None or left_eye is None:
-            e = 1.0
+            missed_detections += 1
         else:
             e = error_estimate(face, right_eye, left_eye)
-        total_error += e
-        for i in range(len(accuracy_tiers)):
-            if e <= accuracy_tiers[i][0]:
-                accuracy_tiers[i][2] += 1
+            total_error += e
+            for i in range(len(accuracy_tiers)):
+                if e <= accuracy_tiers[i][0]:
+                    accuracy_tiers[i][2] += 1
         print("testing: done %.2f%%" % ((float(n)*100) / float(len(facedb.faces)),), end="\r")
 
-    total_error /= len(facedb.faces)
+    total_detected = len(facedb.faces) - missed_detections
+    total_error /= total_detected
     print("Test results:                   ")
+    print("Correct detections: %d out of %d (%.2f)" % (total_detected,
+                                                       len(facedb.faces),
+                                                       float(total_detected) / len(facedb.faces)))
     print("Average error: %f" % total_error)
     print("Accuracy (tiered):")
     for tier in accuracy_tiers:
-        print("    e <= %.2f (%s): %.2f" % (tier[0],tier[1], float(tier[2]) / len(facedb.faces)))
+        print("    e <= %.2f (%s): %.2f" % (tier[0],tier[1], float(tier[2]) / total_detected))
 
 
 def live(cli, algo):
