@@ -3,7 +3,6 @@
 
 #define XCOORD_IN(id) ((id) % image_width)
 #define YCOORD_IN(id) ((id) / image_width)
-#define PIXELID_IN(x, y) ((x) + ((y) * image_width))
 #define PIXELID_OUT(x, y, bin) ((bin) + ((x) * nbins) + ((y) * image_width * nbins))
 
 

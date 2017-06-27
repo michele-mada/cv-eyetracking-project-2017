@@ -1,6 +1,6 @@
 
 
-from utils.histogram.lsh import locality_sensitive_histogram_hybrid as locality_sensitive_histogram
+from utils.histogram.lsh import locality_sensitive_histogram_cl as locality_sensitive_histogram
 from utils.histogram.iif import illumination_invariant_features_cl as illumination_invariant_features
 
 

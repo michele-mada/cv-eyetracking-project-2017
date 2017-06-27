@@ -39,7 +39,7 @@ class CL_Q:
         cl.enqueue_nd_range_kernel(self.queue, kernel, image.shape, None).wait()
 
         cl.enqueue_read_buffer(self.queue, self.output_buf, result).wait()
-        return np.reshape(result, (width, height, num_bins)).astype(np.float32)
+        return np.reshape(result, (width, height, num_bins))
 
 
 

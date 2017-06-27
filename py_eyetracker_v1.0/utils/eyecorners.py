@@ -18,7 +18,10 @@ def find_eye_corners(eye_image, eye_center):
                                             ),
                             all_corners)
     # find the best corner
-    left_corner = max(left_corner_score, key=lambda cs: cs[1])[0]
+    try:
+        left_corner = max(left_corner_score, key=lambda cs: cs[1])[0]
+    except Exception:
+        left_corner = (0, 0)
 
     # give each corner a score, according to our heuristic
     right_corner_score = map(lambda corner: (corner,
@@ -26,6 +29,9 @@ def find_eye_corners(eye_image, eye_center):
                                              ),
                              all_corners)
     # find the best corner
-    right_corner = max(right_corner_score, key=lambda cs: cs[1])[0]
+    try:
+        right_corner = max(right_corner_score, key=lambda cs: cs[1])[0]
+    except Exception:
+        right_corner = (0, 0)
 
     return right_corner, left_corner, all_corners  #TODO: fix x and y coords being reversed

@@ -5,7 +5,12 @@ from utils.histogram.cl_run_Q import CL_Q
 from utils.histogram.cl_run_1D import CL_hist_1D
 
 
+num_bins = 32
+
+
 def locality_sensitive_histogram_hybrid(image, sigma=0.15, num_bins=32, debug_ax=None):
+    # it has some weird bug (try a solid white image)
+    # but it generally works.
     width, height = np.shape(image)
     alpha_x = exp(-sqrt(2.0) / (sigma * width))
     alpha_y = exp(-sqrt(2.0) / (sigma * height))
@@ -30,9 +35,9 @@ def locality_sensitive_histogram_hybrid(image, sigma=0.15, num_bins=32, debug_ax
     # compute right part
     hist_mtx_r = np.copy(hist_mtx)
     f_mtx_r = np.copy(f_mtx)
-    for i in reversed(range(-1, height-1)):
-        hist_mtx_l[:, i, :] = hist_mtx_l[:, i, :] + alpha_x * hist_mtx_l[:, i + 1, :]
-        f_mtx_l[:, i, :] = f_mtx_l[:, i, :] + alpha_x * f_mtx_l[:, i + 1, :]
+    for i in reversed(range(0, height-1)):
+        hist_mtx_r[:, i, :] = hist_mtx_r[:, i, :] + alpha_x * hist_mtx_r[:, i + 1, :]
+        f_mtx_r[:, i, :] = f_mtx_r[:, i, :] + alpha_x * f_mtx_r[:, i + 1, :]
     # combine right and left parts
     hist_mtx = hist_mtx_r + hist_mtx_l - q_mtx
     f_mtx = f_mtx_r + f_mtx_l - 1
@@ -47,9 +52,9 @@ def locality_sensitive_histogram_hybrid(image, sigma=0.15, num_bins=32, debug_ax
     # compute right part
     hist_mtx_r = np.copy(hist_mtx)
     f_mtx_r = np.copy(f_mtx)
-    for i in reversed(range(-1, width-1)):
-        hist_mtx_l[i,:,:] = hist_mtx_l[i,:,:] + alpha_y * hist_mtx_l[i + 1,:,:]
-        f_mtx_l[i,:,:] = f_mtx_l[i,:,:] + alpha_y * f_mtx_l[i + 1,:,:]
+    for i in reversed(range(0, width-1)):
+        hist_mtx_r[i,:,:] = hist_mtx_r[i,:,:] + alpha_y * hist_mtx_r[i + 1,:,:]
+        f_mtx_r[i,:,:] = f_mtx_r[i,:,:] + alpha_y * f_mtx_r[i + 1,:,:]
     # combine right and left parts
     hist_mtx = hist_mtx_r + hist_mtx_l - q_mtx
     f_mtx = f_mtx_r + f_mtx_l - 1
@@ -68,23 +73,20 @@ fast_hist_1D_x.load_program()
 fast_hist_1D_y.load_program()
 
 
-def locality_sensitive_histogram_cl(image, sigma=0.15, num_bins=32, debug_ax=None):
+def locality_sensitive_histogram_cl(image, sigma=0.15, debug_ax=None):
     width, height = np.shape(image)
 
     Q = fast_Q.compute(image, num_bins)
 
-    #TODO: fix this second part of the code
-
     alpha_x = exp(-sqrt(2) / (sigma * width))
-    left_hist_x, right_hist_x, left_norm_x, right_norm_x = fast_hist_1D_y.compute(alpha_x, Q)
-    hist_x = left_hist_x + right_hist_x - Q
-    norm_x = left_norm_x + right_norm_x - 1.0
-
     alpha_y = exp(-sqrt(2) / (sigma * height))
-    left_hist_y, right_hist_y, left_norm_y, right_norm_y = fast_hist_1D_x.compute(alpha_y, hist_x, init_norm=norm_x)
-    hist_y = left_hist_y + right_hist_y - Q
-    norm_y = left_norm_y + right_norm_y - 1.0
+    shapetuple = (width, height, num_bins)
+    linearized_Q = Q.reshape((np.size(Q)))
+    F_1 = np.ones_like(linearized_Q)
 
-    hist = hist_y / norm_y
+    hist_1, norm_1 = fast_hist_1D_y.compute(linearized_Q, F_1, alpha_y, shapetuple)
+    hist_2, norm_2 = fast_hist_1D_x.compute(hist_1, norm_1, alpha_x, shapetuple)
 
-    return hist
+    hist = hist_2 / norm_2
+
+    return hist.reshape(Q.shape)

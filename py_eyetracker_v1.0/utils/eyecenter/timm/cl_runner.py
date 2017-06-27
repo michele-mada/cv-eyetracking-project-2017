@@ -43,7 +43,6 @@ class CLTimmBarth:
         kernel.set_arg(5, self.buf_inverse)
         kernel.set_arg(6, self.output_buf)
 
-
         cl.enqueue_nd_range_kernel(self.queue, kernel, inverse.shape, None).wait()
 
         result = np.empty_like(inverse)

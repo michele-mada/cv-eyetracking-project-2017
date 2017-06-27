@@ -47,13 +47,15 @@ class CL_IIF:
     Just a wrapper around all the opencl boilerplate code
     """
 
-    def __init__(self):
+    def __init__(self, num_bins=32):
+        self.num_bins = num_bins
         self.context = cl.create_some_context()
         self.queue = cl.CommandQueue(self.context)
 
     def load_program(self, program_path="cl_kernels/iif_kernel.cl"):
         with open(program_path, "r") as fp:
-            self.program = cl.Program(self.context, fp.read()).build()
+            self.source = "#define NBINS %d\n" % self.num_bins + fp.read()
+            self.program = cl.Program(self.context, self.source).build()
 
     def compute(self, floatimage, histogram, k):
         width, height, nbins = np.shape(histogram)
@@ -69,14 +71,13 @@ class CL_IIF:
         self.output_buf = cl.Buffer(self.context, mf.READ_WRITE, transform.nbytes)
 
         kernel = self.program.IIF
-        kernel.set_scalar_arg_dtypes([np.uintc, np.uintc, np.ubyte, np.float32] + [None] * 3)
+        kernel.set_scalar_arg_dtypes([np.uintc, np.uintc, np.float32] + [None] * 3)
         kernel.set_arg(0, np.uintc(width))
         kernel.set_arg(1, np.uintc(height))
-        kernel.set_arg(2, np.ubyte(nbins))
-        kernel.set_arg(3, np.float32(k))
-        kernel.set_arg(4, self.buf_image)
-        kernel.set_arg(5, self.buf_histogram)
-        kernel.set_arg(6, self.output_buf)
+        kernel.set_arg(2, np.float32(k))
+        kernel.set_arg(3, self.buf_image)
+        kernel.set_arg(4, self.buf_histogram)
+        kernel.set_arg(5, self.output_buf)
 
         cl.enqueue_nd_range_kernel(self.queue, kernel, image_linear.shape, None).wait()
 

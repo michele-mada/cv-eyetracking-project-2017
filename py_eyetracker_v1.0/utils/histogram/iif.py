@@ -2,6 +2,7 @@ from math import exp, sqrt
 import numpy as np
 
 from utils.histogram.cl_run_iif import CL_IIF, CL_IIF_BINID
+from utils.histogram.lsh import num_bins
 
 
 def illumination_invariant_features_hybrid(image, histogram, k=0.1, debug_ax=None):
@@ -28,7 +29,7 @@ def illumination_invariant_features_hybrid(image, histogram, k=0.1, debug_ax=Non
     return feature_img
 
 
-fast_iif = CL_IIF()
+fast_iif = CL_IIF(num_bins=num_bins)
 fast_iif.load_program()
 
 
