@@ -28,6 +28,7 @@ algos = {
 }
 equaliz = {
     "h": exposure.equalize_hist,
+    "ah": lambda img: exposure.equalize_adapthist(img, clip_limit=0.03),
     "lsh": lsh_equalization,
 }
 
@@ -173,11 +174,11 @@ def parsecli():
     parser.add_argument('--contrast', help='override the webcam default contrast setting (value [0.0, 1.0])',
                         type=str, default="None")
     parser.add_argument('-a','--algo', help='pupil center algorithm to use',
-                        type=str, default="timm", choices=["hough", "timm"])
+                        type=str, default="timm", choices=algos.keys())
     parser.add_argument('-p', '--program-timm', help='path to the opencl kernel implementing timm and barth algorithm',
                         type=str, default="cl_kernels/timm_barth_kernel.cl")
     parser.add_argument('-e', '--equalization', help='type of histogram equalization to use',
-                        type=str, default="h", choices=["h", "lsh"])
+                        type=str, default="h", choices=equaliz.keys())
     parser.add_argument('-d','--debug', help='enable debug mode', action='store_true')
     parser.add_argument('--bioid-folder', metavar='bioID folder', help='BioID face database folder',
                         type=str, default="../../BioID-FaceDatabase-V1.2")

@@ -12,6 +12,7 @@ from classes import Point
 from utils.eyecenter.interface import EyeFeaturesExtractor
 from utils.eyecenter.timm.cl_runner import CLTimmBarth
 from utils.eyecorners import find_eye_corners
+from utils.histogram.lsh_equalization import lsh_equalization
 
 
 class TimmAndBarth(EyeFeaturesExtractor):
@@ -68,7 +69,7 @@ class TimmAndBarth(EyeFeaturesExtractor):
             eye_image = resize(eye_image, (max_w, max_h))
 
         # important: histogram equalization
-        if self.equalization == exposure.equalize_hist:
+        if self.equalization != lsh_equalization:
             eye_image = exposure.equalize_hist(eye_image)
         #eye_image = gaussian(eye_image)
         width, height = np.shape(eye_image)
