@@ -34,9 +34,9 @@ class CLTimmBarth:
         self.output_buf = cl.Buffer(self.context, mf.READ_WRITE, inverse.nbytes)
 
         kernel = self.program.timm_and_barth
-        kernel.set_scalar_arg_dtypes([np.uintc, np.uintc, np.intc] + [None] * 4)
-        kernel.set_arg(0, np.uintc(width))
-        kernel.set_arg(1, np.uintc(height))
+        kernel.set_scalar_arg_dtypes([np.intc, np.intc, np.intc] + [None] * 4)
+        kernel.set_arg(0, np.intc(width))
+        kernel.set_arg(1, np.intc(height))
         kernel.set_arg(2, np.intc(locality))
         kernel.set_arg(3, self.buf_x_grad)
         kernel.set_arg(4, self.buf_y_grad)

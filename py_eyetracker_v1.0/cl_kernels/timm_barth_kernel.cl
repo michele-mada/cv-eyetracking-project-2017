@@ -1,12 +1,12 @@
 
-#define XCOORD(id) ((id) % image_width)
-#define YCOORD(id) ((id) / image_width)
-#define PIXELID(x, y) ((x) + ((y) * image_width))
+#define YCOORD(id) ((id) % image_height)
+#define XCOORD(id) ((id) / image_height)
+#define PIXELID(x, y) ((y) + ((x) * image_height))
 
 
 __kernel void timm_and_barth(
-    unsigned int image_width,
-    unsigned int image_height,
+    int image_width,
+    int image_height,
     int local_radius,
     __global float* x_derivatives,
     __global float* y_derivatives,

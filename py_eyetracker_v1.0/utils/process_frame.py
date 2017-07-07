@@ -3,6 +3,7 @@ from skimage import img_as_float, img_as_ubyte
 
 from classes import Rect
 from utils.eye_area import detect_haar_cascade, eye_regions_from_face, split_eyes
+from utils.face_landmarks.dlib_based import eye_area_detection_step, pick_eye_corners
 
 
 def cropped_rect(image, rect):
@@ -13,6 +14,12 @@ def cropped_rect(image, rect):
     :return: numpy 2d array containing the cropped region
     """
     (x1, y1, width, height) = rect
+    if x1 < 0:
+        width += x1
+        x1 = 0
+    if y1 < 0:
+        height += y1
+        y1 = 0
     return np.copy(image[y1:y1+height,x1:x1+width])
 
 
@@ -22,25 +29,6 @@ def image_preprocessing_step(image_cv2format, algo):
     image_cv2format_equalized = img_as_ubyte(picture_float_equalized)
     picture = picture_float_equalized
     return picture, image_cv2format, image_cv2format_equalized
-
-
-def eye_area_detection_step(image_cv2format, image_cv2format_equalized, cascade_files):
-    eye_cascade_file = cascade_files["eye"]
-    face_cascade_file = cascade_files["face"]
-    detect_attempt = "equalized"
-    eyes = detect_haar_cascade(image_cv2format_equalized, eye_cascade_file)
-    if len(eyes) < 2:  # if eyes not found, try without the equalization
-        detect_attempt = "raw"
-        eyes = detect_haar_cascade(image_cv2format, eye_cascade_file)
-        if len(eyes) < 2:  # if eyes not found again, try just detecting the face
-            detect_attempt = "geometric"
-            face = detect_haar_cascade(image_cv2format_equalized, face_cascade_file)
-            if len(face) < 1:  # give up
-                detect_attempt = "gave up"
-                return False, detect_attempt, []
-            else:
-                eyes = eye_regions_from_face(face[0])  # TODO: use the most central face in case many faces are detected
-    return True, detect_attempt, eyes
 
 
 def geometric_eye_area_selection_step(eyes):
@@ -78,12 +66,15 @@ def process_frame(image_cv2format, algo, cascade_files):
     picture, image_cv2format, image_cv2format_equalized = image_preprocessing_step(image_cv2format, algo)
 
     # eye area detection
-    success, detect_method, eyes = eye_area_detection_step(image_cv2format, image_cv2format_equalized, cascade_files)
+    success, detect_method, eyes, points68 = eye_area_detection_step(image_cv2format, image_cv2format_equalized)
+    #success, detect_method, eyes = eye_area_detection_step_haar(image_cv2format, image_cv2format_equalized, cascade_files)
     if not success:
         return picture, None, None, detect_method, []
 
     # geometrically select right and left eye
     right_eye, left_eye, not_eyes = geometric_eye_area_selection_step(eyes)
+    pick_eye_corners(right_eye, points68)
+    pick_eye_corners(left_eye, points68)
 
     # extract the eye features (updates the objects right_eye and left_eye)
     eye_features_extraction_step(picture, right_eye, left_eye, algo)

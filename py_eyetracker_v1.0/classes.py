@@ -22,9 +22,17 @@ class Eye:
     def inner_corner(self):
         return Point(self.area.x + self.inner_corner_relative.x, self.area.y + self.inner_corner_relative.y)
 
+    @inner_corner.setter
+    def inner_corner(self, value):
+        self.inner_corner_relative = Point(value[0] - self.area.x, value[1] - self.area.y)
+
     @property
     def outer_corner(self):
         return Point(self.area.x + self.outer_corner_relative.x, self.area.y + self.outer_corner_relative.y)
+
+    @outer_corner.setter
+    def outer_corner(self, value):
+        self.outer_corner_relative = Point(value[0] - self.area.x, value[1] - self.area.y)
 
     @property
     def absolute_area_center(self):

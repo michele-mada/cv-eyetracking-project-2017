@@ -151,7 +151,8 @@ def main(cli):
     algo.equalization = equaliz[cli.equalization]
 
     if cli.algo == "timm":
-        algo.context.load_program()
+        algo.context.load_program(program_path="cl_kernels/timm_barth_smallpic_kernel.cl")
+        #algo.context.load_program()
 
     if cli.file == "-":
         live(cli, algo)
@@ -180,11 +181,11 @@ def parsecli():
                         type=int, default=0)
     # algorithm selection parameters
     parser.add_argument('-a','--algo', help='pupil center algorithm to use',
-                        type=str, default="timm", choices=algos.keys())
+                        type=str, default="hough", choices=algos.keys())
     parser.add_argument('-e', '--equalization', help='type of histogram equalization to use',
-                        type=str, default="h", choices=equaliz.keys())
+                        type=str, default="ah", choices=equaliz.keys())
     # other
-    parser.add_argument('--bioid-folder', metavar='bioID_folder', help='BioID face database folder',
+    parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")
     return parser.parse_args()
 
