@@ -43,7 +43,6 @@ def one_shot(cli, algo):
     image_cv2 = cv2.imread(cli.file)
     image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_RGB2GRAY)
 
-    fig, ax_img = plt.subplots(1)
     if cli.debug:
         fig2, axes_2 = algo.create_debug_figure()
         algo.setup_debug_parameters(True, axes_2)
@@ -55,8 +54,7 @@ def one_shot(cli, algo):
     print("Eye detection successful (%s)" % detect_string)
     print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
 
-    ax_img.set_title("eye detect (%s)" % detect_string)
-    draw_routine(ax_img, picture, right_eye, left_eye, not_eyes)
+    draw_routine(picture, right_eye, left_eye, not_eyes, "detection")
     plt.show()
 
 
@@ -123,26 +121,26 @@ def live(cli, algo):
                                )
     camera.start()
     plt.ion()
-    fig, ax_img = plt.subplots(1)
     if cli.debug:
         fig2, axes_2 = algo.create_debug_figure()
         algo.setup_debug_parameters(True, axes_2)
 
     cascade_files = get_cascade_files(cli)
 
-    while plt.fignum_exists(1):
+    while True:
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
-        ax_img.clear()
         algo.clean_debug_axes()
 
         picture, right_eye, left_eye, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
 
-        ax_img.set_title("eye detect (%s)" % detect_string)
-        draw_routine(ax_img, picture, right_eye, left_eye, not_eyes)
-        plt.pause(0.1)
+        draw_routine(picture, right_eye, left_eye, not_eyes, "detection")
 
+        key = cv2.waitKey(1)
+        if key == 27: break
+
+    cv2.destroyAllWindows()  # I like the name of this function
     camera.stop()
 
 

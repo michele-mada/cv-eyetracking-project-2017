@@ -33,11 +33,10 @@ def image_preprocessing_step(image_cv2format, algo):
 
 def geometric_eye_area_selection_step(eyes):
     right_eye, left_eye = split_eyes(eyes)
-    not_eyes = []
-    for c in eyes:
-        candidate = tuple(c)
-        if candidate == right_eye.area or candidate == left_eye.area: continue
-        not_eyes.append(Rect(*candidate))
+
+    not_eyes = list(map(tuple, eyes))
+    not_eyes.remove(tuple(left_eye.area))
+    not_eyes.remove(tuple(right_eye.area))
     return right_eye, left_eye, not_eyes
 
 

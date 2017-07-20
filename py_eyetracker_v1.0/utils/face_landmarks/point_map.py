@@ -9,3 +9,8 @@ right_eye_inner_corner = 39
 left_eye_outer_corner = 45
 left_eye_inner_corner = 42
 
+nose_tip = 30
+chin = 8
+
+right_mouth_corner = 48
+left_mouth_corner = 54
