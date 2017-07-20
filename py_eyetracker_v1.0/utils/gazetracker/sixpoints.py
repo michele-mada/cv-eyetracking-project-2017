@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 
 from utils.face_landmarks import point_map
+from utils.camera.parameters import *
 
 
 model_points = np.array([
@@ -28,15 +29,9 @@ def six_points(dlib_68points, image_shape):
     ], dtype="double")
 
     # camera parameters
-    focal_length = image_shape[1]
-    center = (image_shape[1] / 2, image_shape[0] / 2)
-    camera_matrix = np.array(
-        [[focal_length, 0, center[0]],
-         [0, focal_length, center[1]],
-         [0, 0, 1]], dtype="double"
-    )
+    camera_matrix = camera_matrix_from_picture_shape(image_shape)
+    dist_coeffs = get_dist_coeffs()
 
-    dist_coeffs = np.zeros((4, 1))  # Assuming no lens distortion
     (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix,
-                                                                  dist_coeffs, flags=cv2.CV_ITERATIVE)
+                                                                  dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
     return rotation_vector, translation_vector

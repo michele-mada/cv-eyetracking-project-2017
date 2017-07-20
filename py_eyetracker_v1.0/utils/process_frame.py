@@ -1,9 +1,10 @@
 import numpy as np
 from skimage import img_as_float, img_as_ubyte
 
-from classes import Rect
+from classes import Rect, Face
 from utils.eye_area import detect_haar_cascade, eye_regions_from_face, split_eyes
 from utils.face_landmarks.dlib_based import eye_area_detection_step, pick_eye_corners
+from utils.gazetracker.sixpoints import six_points
 
 
 def cropped_rect(image, rect):
@@ -48,6 +49,10 @@ def eye_features_extraction_step(picture, right_eye, left_eye, algo):
     algo.detect_eye_features(left_eyepatch, left_eye)
 
 
+def face_spatial_tracking_step(face, picture):
+    face.orientation, face.translation = six_points(face.dlib68_points, picture.shape)
+
+
 def process_frame(image_cv2format, algo, cascade_files):
     """
     Preprocess and image and extract useful features
@@ -61,6 +66,8 @@ def process_frame(image_cv2format, algo, cascade_files):
         list of Rect which could be eyes but were refused by the geometric estimator
     """
 
+    new_face = Face()
+
     # pre-processing
     picture, image_cv2format, image_cv2format_equalized = image_preprocessing_step(image_cv2format, algo)
 
@@ -68,7 +75,10 @@ def process_frame(image_cv2format, algo, cascade_files):
     success, detect_method, eyes, points68 = eye_area_detection_step(image_cv2format, image_cv2format_equalized)
     #success, detect_method, eyes = eye_area_detection_step_haar(image_cv2format, image_cv2format_equalized, cascade_files)
     if not success:
-        return picture, None, None, detect_method, []
+        return picture, None, detect_method, []
+
+    new_face.dlib68_points = points68
+    face_spatial_tracking_step(new_face, picture)
 
     # geometrically select right and left eye
     right_eye, left_eye, not_eyes = geometric_eye_area_selection_step(eyes)
@@ -78,4 +88,7 @@ def process_frame(image_cv2format, algo, cascade_files):
     # extract the eye features (updates the objects right_eye and left_eye)
     eye_features_extraction_step(picture, right_eye, left_eye, algo)
 
-    return picture, right_eye, left_eye, detect_method, not_eyes
+    new_face.left_eye = left_eye
+    new_face.right_eye = right_eye
+
+    return picture, new_face, detect_method, not_eyes

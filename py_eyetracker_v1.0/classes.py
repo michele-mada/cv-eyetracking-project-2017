@@ -1,8 +1,19 @@
 from collections import namedtuple
+import numpy as np
 
 
 Rect = namedtuple("Rect", ["x", "y", "width", "height"])
 Point = namedtuple("Point", ["x", "y"])
+
+
+class Face:
+
+    def __init__(self):
+        self.dlib68_points = []
+        self.right_eye = None
+        self.left_eye = None
+        self.orientation = np.zeros((3,))
+        self.translation = np.zeros((3,))
 
 
 class Eye:

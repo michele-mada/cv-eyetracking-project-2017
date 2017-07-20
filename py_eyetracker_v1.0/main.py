@@ -12,7 +12,7 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from skimage import exposure
 
-from utils.camera import WebcamVideoStream
+from utils.camera.capture import WebcamVideoStream
 from utils.eyecenter.py_eyecenter import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
 from utils.histogram.lsh_equalization import lsh_equalization
@@ -49,12 +49,12 @@ def one_shot(cli, algo):
 
     cascade_files = get_cascade_files(cli)
 
-    picture, right_eye, left_eye, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
+    picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
 
     print("Eye detection successful (%s)" % detect_string)
-    print("Eyes (R,L):\n  %s,\n  %s" % (str(right_eye), str(left_eye)))
+    print("Eyes (R,L):\n  %s,\n  %s" % (str(face.right_eye), str(face.left_eye)))
 
-    draw_routine(picture, right_eye, left_eye, not_eyes, "detection")
+    draw_routine(picture, face, not_eyes, "detection", draw_unicorn=cli.unicorn)
     plt.show()
 
 
@@ -88,11 +88,11 @@ def test_run(cli, algo):
     # run the tests
     print("Testing against %d faces" % len(facedb.faces))
     for n, face in enumerate(facedb.faces):
-        picture, right_eye, left_eye, detect_string, not_eyes = process_frame(face.load_cv2(), algo, cascade_files)
-        if right_eye is None or left_eye is None:
+        picture, face, detect_string, not_eyes = process_frame(face.load_cv2(), algo, cascade_files)
+        if face.right_eye is None or face.left_eye is None:
             missed_detections += 1
         else:
-            e = error_estimate(face, right_eye, left_eye)
+            e = error_estimate(face, face.right_eye, face.left_eye)
             total_error += e
             for i in range(len(accuracy_tiers)):
                 if e <= accuracy_tiers[i][0]:
@@ -133,9 +133,9 @@ def live(cli, algo):
 
         algo.clean_debug_axes()
 
-        picture, right_eye, left_eye, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
+        picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
 
-        draw_routine(picture, right_eye, left_eye, not_eyes, "detection")
+        draw_routine(picture, face, not_eyes, "detection", draw_unicorn=cli.unicorn)
 
         key = cv2.waitKey(1)
         if key == 27: break
@@ -182,6 +182,8 @@ def parsecli():
                         type=str, default="hough", choices=algos.keys())
     parser.add_argument('-e', '--equalization', help='type of histogram equalization to use',
                         type=str, default="ah", choices=equaliz.keys())
+    # gaze tracking parameters
+    parser.add_argument('-u', '--unicorn', help='draw a debug vector indicating the face orientation', action='store_true')
     # other
     parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")
