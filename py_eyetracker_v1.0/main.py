@@ -13,8 +13,9 @@ import matplotlib.pyplot as plt
 from skimage import exposure
 
 from utils.camera.capture import WebcamVideoStream
-from utils.eyecenter.py_eyecenter import PyHoughEyecenter
+from utils.eyecenter.hough import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
+from utils.eyecenter.int_proj import GeneralIntegralProjection
 from utils.histogram.lsh_equalization import lsh_equalization
 
 from utils.bioID import BioIDFaceDatabase
@@ -23,7 +24,8 @@ from utils.bioID import BioIDFaceDatabase
 
 algos = {
     "hough": PyHoughEyecenter,
-    "timm": TimmAndBarth
+    "timm": TimmAndBarth,
+    "gip": GeneralIntegralProjection,
 }
 equaliz = {
     "h": exposure.equalize_hist,
@@ -54,8 +56,11 @@ def one_shot(cli, algo):
     print("Eye detection successful (%s)" % detect_string)
     print("Eyes (R,L):\n  %s,\n  %s" % (str(face.right_eye), str(face.left_eye)))
 
+    if cli.debug:
+        plt.pause(0.01)
+
     draw_routine(picture, face, not_eyes, "detection", draw_unicorn=cli.unicorn)
-    plt.show()
+    cv2.waitKey(-1)
 
 
 def test_run(cli, algo):
@@ -72,9 +77,9 @@ def test_run(cli, algo):
         return sqrt((detected.pupil.x - expected.x)**2 +
                     (detected.pupil.y - expected.y)**2)
 
-    def error_estimate(face, detect_righteye, detect_lefteye):
-        return max(distance(face.left_eye, detect_lefteye),
-                   distance(face.right_eye, detect_righteye)) / face.eye_center_distance
+    def error_estimate(bioid_face, detect_righteye, detect_lefteye):
+        return max(distance(bioid_face.left_eye, detect_lefteye),
+                   distance(bioid_face.right_eye, detect_righteye)) / bioid_face.eye_center_distance
 
     total_error = 0.0
     missed_detections = 0
@@ -87,12 +92,12 @@ def test_run(cli, algo):
 
     # run the tests
     print("Testing against %d faces" % len(facedb.faces))
-    for n, face in enumerate(facedb.faces):
-        picture, face, detect_string, not_eyes = process_frame(face.load_cv2(), algo, cascade_files)
-        if face.right_eye is None or face.left_eye is None:
+    for n, bioid_face in enumerate(facedb.faces):
+        picture, face, detect_string, not_eyes = process_frame(bioid_face.load_cv2(), algo, cascade_files)
+        if face is None:
             missed_detections += 1
         else:
-            e = error_estimate(face, face.right_eye, face.left_eye)
+            e = error_estimate(bioid_face, face.right_eye, face.left_eye)
             total_error += e
             for i in range(len(accuracy_tiers)):
                 if e <= accuracy_tiers[i][0]:
@@ -131,7 +136,8 @@ def live(cli, algo):
         image_cv2 = camera.read()
         image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
-        algo.clean_debug_axes()
+        if cli.debug:
+            algo.clean_debug_axes()
 
         picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
 
@@ -139,6 +145,9 @@ def live(cli, algo):
 
         key = cv2.waitKey(1)
         if key == 27: break
+
+        if cli.debug:
+            plt.pause(0.01)
 
     cv2.destroyAllWindows()  # I like the name of this function
     camera.stop()
