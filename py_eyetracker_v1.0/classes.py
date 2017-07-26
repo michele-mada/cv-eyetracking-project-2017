@@ -6,6 +6,25 @@ Rect = namedtuple("Rect", ["x", "y", "width", "height"])
 Point = namedtuple("Point", ["x", "y"])
 
 
+
+class Tracker:
+
+    def __init__(self):
+        self.face = Face()
+        # TODO: calibration data
+        # TODO: historical queue to do some smoothing?
+
+    def update(self, face):
+        self.face = face
+
+    def get_onscreen_gaze_mapping(self):
+        # TODO: compute right eye screen position
+        # TODO: compute left eye screen position
+        # TODO: combine the values?
+        # TODO: apply head rotation offset
+        return (0, 0)
+
+
 class Face:
 
     def __init__(self):
@@ -52,6 +71,11 @@ class Eye:
     @property
     def relative_area_center(self):
         return Point(self.area.width / 2, self.area.height / 2)
+
+    @property
+    def eye_vector(self):
+        return Point(self.inner_corner_relative[0] - self.pupil_relative[0],
+                     self.inner_corner_relative[1] - self.pupil_relative[1])
 
     def set_leftmost_corner(self, point):
         if self.is_right:
