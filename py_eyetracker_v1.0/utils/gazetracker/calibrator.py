@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, Lock
 import time
 import cv2
 import numpy as np
@@ -30,6 +30,7 @@ class Calibrator:
         self.refresh()
         self.algo = algo
         self._worker = None
+        self._traffic_man = Lock()
         self.camera = WebcamVideoStream(src=camera_port)
         self.camera.start()
 
@@ -40,6 +41,8 @@ class Calibrator:
         self.data_bag_right = []
 
     def work_thread(self, duration, screen_point):
+        self._traffic_man.acquire()
+        self.refresh()
         time_started = time.time()
         while time.time() - time_started < duration:
             image_cv2 = self.camera.read()
@@ -53,6 +56,7 @@ class Calibrator:
         self.screen_points_captured.append(screen_point)
         self.right_eye_vectors_captured.append(right_eye_vector)
         self.left_eye_vectors_captured.append(left_eye_vector)
+        self._traffic_man.release()
 
     ## Interface
 
@@ -60,7 +64,6 @@ class Calibrator:
         self.camera.stop()
 
     def capture_point(self, duration, screen_point):
-        self.refresh()
         self._worker = Thread(target=self.work_thread,args=(duration, screen_point))
         self._worker.start()
 
