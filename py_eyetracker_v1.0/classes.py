@@ -2,9 +2,6 @@ from collections import namedtuple
 import numpy as np
 import pickle
 
-from utils.screen_mapping.map_function import map_function
-from utils.gazetracker.calibrator import cal_param_storage_path
-
 
 Rect = namedtuple("Rect", ["x", "y", "width", "height"])
 Point = namedtuple("Point", ["x", "y"])
@@ -23,10 +20,12 @@ class Tracker:
         self.face = face
 
     def load_saved_cal_params(self):
+        from utils.gazetracker.calibrator import cal_param_storage_path
         with open(cal_param_storage_path, "rb") as fp:
             (self.cal_param_right, self.cal_param_left) = pickle.load(fp)
 
     def get_onscreen_gaze_mapping(self):
+        from utils.screen_mapping.map_function import map_function
         right_eye_screen_pos = map_function(self.face.right_eye.eye_vector, *self.cal_param_right)
         left_eye_screen_pos = map_function(self.face.left_eye.eye_vector, *self.cal_param_left)
         # TODO: combine the values?
