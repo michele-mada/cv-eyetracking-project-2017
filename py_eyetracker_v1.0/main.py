@@ -5,13 +5,14 @@ from math import sqrt
 import cv2
 import matplotlib
 
+from utils.gui.visualization import draw_routine
 from utils.process_frame import process_frame
-from utils.visualization import draw_routine
 
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from skimage import exposure
 
+from classes import Tracker
 from utils.camera.capture import WebcamVideoStream
 from utils.eyecenter.hough import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
@@ -20,6 +21,7 @@ from utils.histogram.lsh_equalization import lsh_equalization
 
 from utils.bioID import BioIDFaceDatabase
 
+from utils.gui.tracking_board import TrackingBoard
 
 
 algos = {
@@ -131,6 +133,10 @@ def live(cli, algo):
         algo.setup_debug_parameters(True, axes_2)
 
     cascade_files = get_cascade_files(cli)
+    if cli.tracking:
+        trackboard = TrackingBoard()
+        tracker = Tracker()
+        tracker.load_saved_cal_params()
 
     while True:
         image_cv2 = camera.read()
@@ -140,6 +146,13 @@ def live(cli, algo):
             algo.clean_debug_axes()
 
         picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
+
+        if cli.tracking:
+            if face is not None and face.right_eye is not None and face.left_eye is not None:
+                tracker.update(face)
+                coord = tracker.get_onscreen_gaze_mapping()
+                print(coord)
+                trackboard.update_right(coord)
 
         draw_routine(picture, face, not_eyes, "detection", draw_unicorn=cli.unicorn)
 
@@ -193,6 +206,7 @@ def parsecli():
                         type=str, default="ah", choices=equaliz.keys())
     # gaze tracking parameters
     parser.add_argument('-u', '--unicorn', help='draw a debug vector indicating the face orientation', action='store_true')
+    parser.add_argument('-t', '--tracking', help='display the eye tracking whiteboard', action='store_true')
     # other
     parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")

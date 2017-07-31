@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.widgets import Button
 
+from utils.gazetracker.calibrator import Calibrator
+
 plt.rcParams['toolbar'] = 'None'
 
 plt.switch_backend('TKAgg')
@@ -11,6 +13,9 @@ print(screen_x)
 screen_y =mng.window.winfo_screenheight()
 print(screen_y)
 
+screen_y = 768
+
+calibrator = Calibrator()
 
 #full-window mode
 #mng.window.state('zoomed')
@@ -42,11 +47,14 @@ def start_calibration(event):
     ax.add_artist(gaze_target)
     for i in range(1,num_targets):
         print(i)
+        calibrator.capture_point(interval, centers[index[i-1]])
         plt.pause(interval)
         gaze_target.center = centers[index[i]]
         fig.canvas.draw()
     plt.pause(interval)
     gaze_target.set_visible(False)
+    calibrator.compute_mapping_parameters()
+    calibrator.save_mapping_parameters()
 
 fig = plt.gcf()
 ax = fig.gca()
