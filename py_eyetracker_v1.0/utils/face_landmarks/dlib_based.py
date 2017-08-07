@@ -37,12 +37,12 @@ def detect_faces(image_cv2format, image_cv2format_equalized):
         return rects, detect_attempt, image_cv2format_equalized
 
 
-def bounding_rect(points, border=5):
+def bounding_rect(points, xborder=10, yborder=5):
     x_min = min(points[:, 0])
     x_max = max(points[:, 0])
     y_min = min(points[:, 1])
     y_max = max(points[:, 1])
-    return Rect(x=x_min-border, y=y_min-border, width=x_max-x_min+2*border, height=y_max-y_min+2*border)
+    return Rect(x=x_min-xborder, y=y_min-yborder, width=x_max-x_min+2*xborder, height=y_max-y_min+2*yborder)
 
 
 def eye_area_detection_step(image_cv2format, image_cv2format_equalized, model="data/shape_predictor_68_face_landmarks.dat"):

@@ -1,6 +1,6 @@
 import argparse
 import sys
-from math import sqrt
+from math import sqrt, exp
 
 import cv2
 import matplotlib
@@ -133,9 +133,11 @@ def live(cli, algo):
         algo.setup_debug_parameters(True, axes_2)
 
     cascade_files = get_cascade_files(cli)
+    tracker = Tracker(smooth_frames=4,
+                      #smooth_weight_fun=lambda x: exp(-x*0.5)
+                      )
     if cli.tracking:
         trackboard = TrackingBoard()
-        tracker = Tracker()
         tracker.load_saved_cal_params()
 
     while True:
@@ -147,14 +149,18 @@ def live(cli, algo):
 
         picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
 
-        if cli.tracking:
-            if face is not None and face.right_eye is not None and face.left_eye is not None:
-                tracker.update(face)
-                coord = tracker.get_onscreen_gaze_mapping()
-                print(coord)
-                trackboard.update_right(coord)
+        if face is not None and face.right_eye is not None and face.left_eye is not None:
+            tracker.update(face)
 
-        draw_routine(picture, face, not_eyes, "detection", draw_unicorn=cli.unicorn)
+        if cli.tracking:
+            coord = tracker.get_onscreen_gaze_mapping()
+            print(coord)
+            trackboard.update_right(coord)
+
+        smooth_face = tracker.get_smooth_face()
+        if smooth_face is not None and smooth_face.right_eye is not None and smooth_face.left_eye is not None:
+            #print(smooth_face)
+            draw_routine(picture, smooth_face, not_eyes, "detection", draw_unicorn=cli.unicorn)
 
         key = cv2.waitKey(1)
         if key == 27: break

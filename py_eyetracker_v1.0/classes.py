@@ -1,6 +1,7 @@
-from collections import namedtuple
+from collections import namedtuple, deque
 import numpy as np
 import pickle
+from functools import reduce
 
 
 Rect = namedtuple("Rect", ["x", "y", "width", "height"])
@@ -10,14 +11,30 @@ Point = namedtuple("Point", ["x", "y"])
 
 class Tracker:
 
-    def __init__(self):
+    def __init__(self, smooth_frames=5, smooth_weight_fun=lambda x: 1.0):
         self.face = Face()
+        self.smooth_weight_fun = smooth_weight_fun
         self.cal_param_right = (np.ones((5,)), np.ones((5,)))
         self.cal_param_left = (np.ones((5,)), np.ones((5,)))
-        # TODO: historical queue to do some smoothing?
+        self.history = deque(maxlen=smooth_frames)
 
     def update(self, face):
+        assert(isinstance(face, Face))
+        self.history.append(face)
         self.face = face
+
+    def get_smooth_face(self):
+        if len(self.history) > 0:
+            facesum = reduce(lambda a,b: a + b,
+                             map(lambda i: self.smooth_weight_fun(i[0])*i[1],
+                                 enumerate(self.history)),
+                             Face.zero())
+            avgface = facesum / sum(map(lambda n: self.smooth_weight_fun(n),
+                                        range(len(self.history))))
+            avgface.force_int()
+            return avgface
+        else:
+            return self.face
 
     def load_saved_cal_params(self):
         from utils.gazetracker.calibrator import cal_param_storage_path
@@ -36,12 +53,61 @@ class Tracker:
 class Face:
 
     def __init__(self):
-        self.dlib68_points = []
+        self.dlib68_points = np.zeros((68,2))
         self.right_eye = None
         self.left_eye = None
         self.orientation = np.zeros((3,))
         self.translation = np.zeros((3,))
 
+    @staticmethod
+    def zero():
+        new_face = Face()
+        new_face.right_eye = Eye.zero(True)
+        new_face.left_eye = Eye.zero(False)
+        return new_face
+
+    def force_int(self):
+        self.right_eye.force_int()
+        self.left_eye.force_int()
+
+    def __str__(self):
+        return "Face(points: %s\nright_eye: %s\nleft_eye: %s\norientation: %s\ntranslation: %s\n)" % \
+               (str(self.dlib68_points), str(self.right_eye), str(self.left_eye), str(self.orientation), str(self.translation))
+
+    def __add__(self, other):
+        if not isinstance(other, Face):
+            raise Exception("summing a face with something else")
+        new_face = Face()
+        new_face.dlib68_points = self.dlib68_points + other.dlib68_points
+        new_face.right_eye = self.right_eye + other.right_eye
+        new_face.left_eye = self.left_eye + other.left_eye
+        new_face.orientation = self.orientation + other.orientation
+        new_face.translation = self.translation + other.translation
+        return new_face
+
+    def __truediv__(self, other):
+        if not isinstance(other, (int, float, complex)):
+            raise Exception("dividing a face by <not a number>")
+        new_face = Face()
+        new_face.dlib68_points = self.dlib68_points / other
+        new_face.right_eye = self.right_eye / other
+        new_face.left_eye = self.left_eye / other
+        new_face.orientation = self.orientation / other
+        new_face.translation = self.translation / other
+        return new_face
+
+    def __mul__(self, other):
+        if not isinstance(other, (int, float, complex)):
+            raise Exception("multiplying a face by <not a number>")
+        new_face = Face()
+        new_face.dlib68_points = self.dlib68_points * other
+        new_face.right_eye = self.right_eye * other
+        new_face.left_eye = self.left_eye * other
+        new_face.orientation = self.orientation * other
+        new_face.translation = self.translation * other
+        return new_face
+
+    __rmul__ = __mul__
 
 class Eye:
 
@@ -52,9 +118,24 @@ class Eye:
         self.inner_corner_relative = Point(0, 0)
         self.outer_corner_relative = Point(0, 0)
 
+    @staticmethod
+    def zero(is_right):
+        new_eye = Eye((0,0,0,0), is_right)
+        return new_eye
+
+    def force_int(self):
+        self.area = Rect(x=int(self.area.x), y=int(self.area.y), width=int(self.area.width), height=int(self.area.height))
+        self.pupil_relative = Point(x=int(self.pupil_relative.x), y=int(self.pupil_relative.y))
+        self.inner_corner_relative = Point(x=int(self.inner_corner_relative.x), y=int(self.inner_corner_relative.y))
+        self.outer_corner_relative = Point(x=int(self.outer_corner_relative.x), y=int(self.outer_corner_relative.y))
+
     @property
     def pupil(self):
         return Point(self.area.x + self.pupil_relative.x, self.area.y + self.pupil_relative.y)
+
+    @pupil.setter
+    def pupil(self, value):
+        self.pupil_relative = Point(value[0] - self.area.x, value[1] - self.area.y)
 
     @property
     def inner_corner(self):
@@ -105,3 +186,35 @@ class Eye:
             str(self.inner_corner),
             str(self.outer_corner),
         )
+
+    def __add__(self, other):
+        if not isinstance(other, Eye):
+            raise Exception("summing an eye with something else")
+        new_area = Rect(*((np.array(self.area) + np.array(other.area)).tolist()))
+        new_eye = Eye(new_area, self.is_right and other.is_right)
+        new_eye.pupil = Point(*((np.array(self.pupil) + np.array(other.pupil)).tolist()))
+        new_eye.inner_corner = Point(*((np.array(self.inner_corner) + np.array(other.inner_corner)).tolist()))
+        new_eye.outer_corner = Point(*((np.array(self.outer_corner) + np.array(other.outer_corner)).tolist()))
+        return new_eye
+
+    def __truediv__(self, other):
+        if not isinstance(other, (int, float, complex)):
+            raise Exception("dividing an eye by <not a number>")
+        new_area = Rect(*((np.array(self.area) / other).tolist()))
+        new_eye = Eye(new_area, self.is_right)
+        new_eye.pupil = Point(*((np.array(self.pupil) / other).tolist()))
+        new_eye.inner_corner = Point(*((np.array(self.inner_corner) / other).tolist()))
+        new_eye.outer_corner = Point(*((np.array(self.outer_corner) / other).tolist()))
+        return new_eye
+
+    def __mul__(self, other):
+        if not isinstance(other, (int, float, complex)):
+            raise Exception("multiplying an eye by <not a number>")
+        new_area = Rect(*((np.array(self.area) * other).tolist()))
+        new_eye = Eye(new_area, self.is_right)
+        new_eye.pupil = Point(*((np.array(self.pupil) * other).tolist()))
+        new_eye.inner_corner = Point(*((np.array(self.inner_corner) * other).tolist()))
+        new_eye.outer_corner = Point(*((np.array(self.outer_corner) * other).tolist()))
+        return new_eye
+
+    __rmul__ = __mul__
