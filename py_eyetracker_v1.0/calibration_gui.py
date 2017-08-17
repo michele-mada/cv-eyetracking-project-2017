@@ -1,21 +1,36 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.widgets import Button
+import argparse
 
 from utils.gazetracker.calibrator import Calibrator
+import utils.screen_mapping.map_function
 
 plt.rcParams['toolbar'] = 'None'
 
+
+def parsecli():
+    parser = argparse.ArgumentParser(description="Calibration utility")
+    parser.add_argument('-m', '--mapping-function', help='eye-vector to screen mapping function to use',
+                        type=str, default="quadratic", choices=utils.screen_mapping.map_function.profiles.keys())
+    parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your screen',
+                        type=str, default="None")
+    return parser.parse_args()
+
+
+cli = parsecli()
 plt.switch_backend('TKAgg')
 mng = plt.get_current_fig_manager()
-screen_x =mng.window.winfo_screenwidth()
-print(screen_x)
-screen_y =mng.window.winfo_screenheight()
-print(screen_y)
 
-screen_y = 768
+if cli.override_screensize != "None":
+    (screen_x, screen_y) = tuple(map(int,cli.override_screensize.split("x")))
+else:
+    screen_x =mng.window.winfo_screenwidth()
+    screen_y =mng.window.winfo_screenheight()
 
-calibrator = Calibrator()
+print("Screen size: %dx%d" % (screen_x, screen_y))
+
+calibrator = Calibrator(mapping=cli.mapping_function)
 
 #full-window mode
 #mng.window.state('zoomed')
@@ -47,7 +62,7 @@ def start_calibration(event):
     ax.add_artist(gaze_target)
     for i in range(1,num_targets):
         print(i)
-        calibrator.capture_point(interval, centers[index[i-1]])
+        calibrator.capture_point(interval * 1.5, 1, centers[index[i-1]])
         plt.pause(interval)
         gaze_target.center = centers[index[i]]
         fig.canvas.draw()

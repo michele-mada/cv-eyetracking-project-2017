@@ -17,6 +17,8 @@ from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
 from utils.eyecenter.int_proj import GeneralIntegralProjection
 from utils.histogram.lsh_equalization import lsh_equalization
 
+import utils.screen_mapping.map_function
+
 
 cal_param_storage_path = "calibration.dat"
 
@@ -40,7 +42,7 @@ def get_cascade_files():
     }
 
 
-def remove_outlier(fromlist, m=2):
+def remove_outlier(fromlist, m=1):
     (x_coords, y_coords) = zip(*list(map(lambda i: i.tolist(), fromlist)))
     mean_x = np.mean(x_coords, axis=0)
     std_x = np.std(x_coords, axis=0)
@@ -54,7 +56,7 @@ def remove_outlier(fromlist, m=2):
 
 class Calibrator(LogMaster):
 
-    def __init__(self, camera_port=0, algo="hough", equaliz="ah", loglevel=logging.DEBUG):
+    def __init__(self, camera_port=0, algo="hough", equaliz="ah", mapping="quadratic", loglevel=logging.DEBUG):
         self.setLogger(self.__class__.__name__, loglevel)
         self.screen_points_captured = []
         self.right_eye_vectors_captured = []
@@ -63,8 +65,10 @@ class Calibrator(LogMaster):
         self.params_left_eye = None
         self.refresh()
         self.setup_algo(algo, equaliz)
+        self.mapping = mapping
         self._worker = None
         self._traffic_man = Lock()
+        self.logger.info("Calibrator ready; using algo=%s, equalizer=%s, mapping fun=%s" % (algo, equaliz, mapping))
         self.camera = WebcamVideoStream(src=camera_port)
         self.camera.start()
 
@@ -80,8 +84,9 @@ class Calibrator(LogMaster):
         self.data_bag_left = []
         self.data_bag_right = []
 
-    def work_thread(self, duration, screen_point):
+    def work_thread(self, duration, wait_before, screen_point):
         self._traffic_man.acquire()
+        time.sleep(wait_before)
         self.logger.debug("Aquiring point %s" % str(screen_point))
         self.refresh()
         time_started = time.time()
@@ -108,11 +113,12 @@ class Calibrator(LogMaster):
     def stop(self):
         self.camera.stop()
 
-    def capture_point(self, duration, screen_point):
-        self._worker = Thread(target=self.work_thread,args=(duration, screen_point))
+    def capture_point(self, duration, wait_before, screen_point):
+        self._worker = Thread(target=self.work_thread,args=(duration, wait_before, screen_point))
         self._worker.start()
 
     def compute_mapping_parameters(self):
+        utils.screen_mapping.map_function.current_profile = self.mapping
         self.params_right_eye = tuple(compute_params(self.screen_points_captured, self.right_eye_vectors_captured))
         self.params_left_eye = tuple(compute_params(self.screen_points_captured, self.left_eye_vectors_captured))
         return self.params_right_eye, self.params_left_eye
@@ -120,7 +126,7 @@ class Calibrator(LogMaster):
     def save_mapping_parameters(self):
         if self.params_right_eye is None or self.params_left_eye is None:
             self.compute_mapping_parameters()
-        with open(cal_param_storage_path, "wb") as fp:
+        with open(cal_param_storage_path + "." + self.mapping, "wb") as fp:
             pickle.dump((self.params_right_eye, self.params_left_eye), fp)
         self.logger.debug("Calibration parameters (over)written to file %s" % cal_param_storage_path)
 

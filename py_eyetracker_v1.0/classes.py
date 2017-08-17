@@ -12,10 +12,13 @@ Point = namedtuple("Point", ["x", "y"])
 class Tracker:
 
     def __init__(self, smooth_frames=5, smooth_weight_fun=lambda x: 1.0):
+        from utils.screen_mapping.map_function import calibration_params_vector_length
         self.face = Face()
         self.smooth_weight_fun = smooth_weight_fun
-        self.cal_param_right = (np.ones((5,)), np.ones((5,)))
-        self.cal_param_left = (np.ones((5,)), np.ones((5,)))
+        self.cal_param_right = (np.ones((calibration_params_vector_length(),)),
+                                np.ones((calibration_params_vector_length(),)))
+        self.cal_param_left = (np.ones((calibration_params_vector_length(),)),
+                               np.ones((calibration_params_vector_length(),)))
         self.history = deque(maxlen=smooth_frames)
 
     def update(self, face):
@@ -38,16 +41,20 @@ class Tracker:
 
     def load_saved_cal_params(self):
         from utils.gazetracker.calibrator import cal_param_storage_path
-        with open(cal_param_storage_path, "rb") as fp:
+        from utils.screen_mapping.map_function import current_profile
+        with open(cal_param_storage_path + "." + current_profile, "rb") as fp:
             (self.cal_param_right, self.cal_param_left) = pickle.load(fp)
 
-    def get_onscreen_gaze_mapping(self):
+    def get_onscreen_gaze_mapping(self, smooth=False):
         from utils.screen_mapping.map_function import map_function
-        right_eye_screen_pos = map_function(self.face.right_eye.eye_vector, *self.cal_param_right)
-        left_eye_screen_pos = map_function(self.face.left_eye.eye_vector, *self.cal_param_left)
+        face = self.face
+        if smooth:
+            face = self.get_smooth_face()
+        right_eye_screen_pos = map_function(face.right_eye.eye_vector, *self.cal_param_right)
+        left_eye_screen_pos = map_function(face.left_eye.eye_vector, *self.cal_param_left)
         # TODO: combine the values?
         # TODO: apply head rotation offset
-        return right_eye_screen_pos
+        return right_eye_screen_pos, left_eye_screen_pos
 
 
 class Face:

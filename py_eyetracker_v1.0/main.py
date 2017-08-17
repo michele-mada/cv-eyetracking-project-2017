@@ -22,6 +22,7 @@ from utils.histogram.lsh_equalization import lsh_equalization
 from utils.bioID import BioIDFaceDatabase
 
 from utils.gui.tracking_board import TrackingBoard
+import utils.screen_mapping.map_function
 
 
 algos = {
@@ -152,10 +153,11 @@ def live(cli, algo):
         if face is not None and face.right_eye is not None and face.left_eye is not None:
             tracker.update(face)
 
-        if cli.tracking:
-            coord = tracker.get_onscreen_gaze_mapping()
-            print(coord)
-            trackboard.update_right(coord)
+            if cli.tracking:
+                coord_right, coord_left = tracker.get_onscreen_gaze_mapping(smooth=True)
+                print(coord_right, coord_left)
+                trackboard.update_right(coord_right)
+                trackboard.update_left(coord_left)
 
         smooth_face = tracker.get_smooth_face()
         if smooth_face is not None and smooth_face.right_eye is not None and smooth_face.left_eye is not None:
@@ -179,6 +181,8 @@ def main(cli):
     if cli.algo == "timm":
         algo.context.load_program(program_path="cl_kernels/timm_barth_smallpic_kernel.cl")
         #algo.context.load_program()
+    if cli.tracking:
+        utils.screen_mapping.map_function.current_profile = cli.mapping_function
 
     if cli.file == "-":
         live(cli, algo)
@@ -189,7 +193,7 @@ def main(cli):
 
 
 def parsecli():
-    parser = argparse.ArgumentParser(description="Find eyes and eye-centers from an image")
+    parser = argparse.ArgumentParser(description="Eye tracking experiment")
     # main generic parameters
     parser.add_argument('file', help='filename of the picture; - for webcam; \"test\" to run a performance test', type=str)
     parser.add_argument('-d', '--debug', help='enable debug mode', action='store_true')
@@ -213,6 +217,8 @@ def parsecli():
     # gaze tracking parameters
     parser.add_argument('-u', '--unicorn', help='draw a debug vector indicating the face orientation', action='store_true')
     parser.add_argument('-t', '--tracking', help='display the eye tracking whiteboard', action='store_true')
+    parser.add_argument('-m', '--mapping-function', help='eye-vector to screen mapping function to use',
+                        type=str, default="quadratic", choices=utils.screen_mapping.map_function.profiles.keys())
     # other
     parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")

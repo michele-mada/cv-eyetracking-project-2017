@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import least_squares
 
-from utils.screen_mapping.map_function import oneD_map_function
+from utils.screen_mapping.map_function import oneD_map_function, calibration_params_vector_length
 
 
 def compute_error(screen_coordinate, eye_vector, candidate_params):
@@ -24,9 +24,9 @@ def compute_params(screen_points, eye_vectors):
                                  zip(y_screen_points, eye_vectors))))
 
     optimization_res_x = least_squares(error_function_x,
-                                       np.ones((5,)))
+                                       np.ones((calibration_params_vector_length(),)))
     optimization_res_y = least_squares(error_function_y,
-                                       np.ones((5,)))
+                                       np.ones((calibration_params_vector_length(),)))
 
     params_x = optimization_res_x.x
     params_y = optimization_res_y.x
