@@ -60,13 +60,12 @@ gaze_target = plt.Circle(centers[index[0]], 20, color='r')
 def start_calibration(event):
     axbutton.set_visible(False)
     ax.add_artist(gaze_target)
-    for i in range(1,num_targets):
+    for i in range(num_targets):
         print(i)
-        calibrator.capture_point(interval * 1.5, 1, centers[index[i-1]])
-        plt.pause(interval)
         gaze_target.center = centers[index[i]]
         fig.canvas.draw()
-    plt.pause(interval)
+        calibrator.capture_point(interval, 1, centers[index[i]])
+        plt.pause(interval + 1)
     gaze_target.set_visible(False)
     calibrator.compute_mapping_parameters()
     calibrator.save_mapping_parameters()

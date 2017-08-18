@@ -87,15 +87,16 @@ class Calibrator(LogMaster):
     def work_thread(self, duration, wait_before, screen_point):
         self._traffic_man.acquire()
         time.sleep(wait_before)
-        self.logger.debug("Aquiring point %s" % str(screen_point))
+        self.logger.debug("Aquiring point #%d, %s" % (len(self.screen_points_captured), str(screen_point)))
         self.refresh()
         time_started = time.time()
         while time.time() - time_started < duration:
             image_cv2 = self.camera.read()
             image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
             picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, self.algo, get_cascade_files())
-            self.data_bag_right.append(np.array(face.right_eye.eye_vector).astype(np.float))
-            self.data_bag_left.append(np.array(face.left_eye.eye_vector).astype(np.float))
+            if face is not None and face.right_eye is not None and face.left_eye is not None:
+                self.data_bag_right.append(np.array(face.right_eye.eye_vector).astype(np.float))
+                self.data_bag_left.append(np.array(face.left_eye.eye_vector).astype(np.float))
 
         right_eye_vector = np.mean(remove_outlier(self.data_bag_right), axis=0)
         left_eye_vector = np.mean(remove_outlier(self.data_bag_left), axis=0)
