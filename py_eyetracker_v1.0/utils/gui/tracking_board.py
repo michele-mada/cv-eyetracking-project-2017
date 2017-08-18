@@ -16,7 +16,7 @@ class TrackingBoard:
             mng.window.winfo_screenheight(),
             mng.window.winfo_screenwidth(),
         )
-        self.screen_size = (768,1366)
+        #self.screen_size = (768,1366)
         print(self.screen_size)
         plt.close()
         cv2.namedWindow(self.wintitle)
