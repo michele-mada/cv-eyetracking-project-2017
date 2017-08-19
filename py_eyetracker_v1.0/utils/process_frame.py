@@ -1,10 +1,10 @@
 import numpy as np
 from skimage import img_as_float, img_as_ubyte
 
-from classes import Rect, Face
-from utils.eye_area import detect_haar_cascade, eye_regions_from_face, split_eyes
+from classes import Face
+from utils.eye_area import split_eyes
 from utils.face_landmarks.dlib_based import eye_area_detection_step, pick_eye_corners
-from utils.gazetracker.sixpoints import six_points
+from utils.face_landmarks.sixpoints import six_points
 
 
 def cropped_rect(image, rect):
