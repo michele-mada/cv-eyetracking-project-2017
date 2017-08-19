@@ -1,18 +1,16 @@
+import argparse
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.widgets import Button
-import argparse
 
-from utils.gazetracker.calibrator import Calibrator
-import utils.screen_mapping.map_function
+from utils.screen_mapping.calibrator import CaptureCalibrator
 
 plt.rcParams['toolbar'] = 'None'
 
 
 def parsecli():
     parser = argparse.ArgumentParser(description="Calibration utility")
-    parser.add_argument('-m', '--mapping-function', help='eye-vector to screen mapping function to use',
-                        type=str, default="quadratic", choices=utils.screen_mapping.map_function.profiles.keys())
     parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your screen',
                         type=str, default="None")
     return parser.parse_args()
@@ -30,7 +28,7 @@ else:
 
 print("Screen size: %dx%d" % (screen_x, screen_y))
 
-calibrator = Calibrator(mapping=cli.mapping_function)
+calibrator = CaptureCalibrator()
 
 #full-window mode
 #mng.window.state('zoomed')
@@ -41,7 +39,7 @@ mng.full_screen_toggle()
 num_targets = 9
 radius = 30
 padding = 20
-interval = 3
+interval = 5
 centers = [(radius + padding, screen_y - radius - padding),
            (screen_x/2, screen_y - radius - padding),
            (screen_x - radius - padding, screen_y - radius - padding),
@@ -64,10 +62,9 @@ def start_calibration(event):
         print(i)
         gaze_target.center = centers[index[i]]
         fig.canvas.draw()
-        calibrator.capture_point(interval, 1, centers[index[i]])
+        calibrator.capture_point(interval * 1.2, 1, centers[index[i]])
         plt.pause(interval + 1)
     gaze_target.set_visible(False)
-    calibrator.compute_mapping_parameters()
     calibrator.save_mapping_parameters()
 
 fig = plt.gcf()

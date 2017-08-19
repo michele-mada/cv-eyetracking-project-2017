@@ -22,7 +22,7 @@ from utils.histogram.lsh_equalization import lsh_equalization
 from utils.bioID import BioIDFaceDatabase
 
 from utils.gui.tracking_board import TrackingBoard
-import utils.screen_mapping.map_function
+from utils.screen_mapping import mapper_implementations
 
 
 algos = {
@@ -134,7 +134,8 @@ def live(cli, algo):
         algo.setup_debug_parameters(True, axes_2)
 
     cascade_files = get_cascade_files(cli)
-    tracker = Tracker(smooth_frames=4,
+    tracker = Tracker(mapper_implementations[cli.mapping_function],
+                      smooth_frames=4,
                       #smooth_weight_fun=lambda x: exp(-x*0.5)
                       )
     if cli.tracking:
@@ -181,8 +182,6 @@ def main(cli):
     if cli.algo == "timm":
         algo.context.load_program(program_path="cl_kernels/timm_barth_smallpic_kernel.cl")
         #algo.context.load_program()
-    if cli.tracking:
-        utils.screen_mapping.map_function.current_profile = cli.mapping_function
 
     if cli.file == "-":
         live(cli, algo)
@@ -218,7 +217,7 @@ def parsecli():
     parser.add_argument('-u', '--unicorn', help='draw a debug vector indicating the face orientation', action='store_true')
     parser.add_argument('-t', '--tracking', help='display the eye tracking whiteboard', action='store_true')
     parser.add_argument('-m', '--mapping-function', help='eye-vector to screen mapping function to use',
-                        type=str, default="quadratic", choices=utils.screen_mapping.map_function.profiles.keys())
+                        type=str, default="poly_quad", choices=mapper_implementations.keys())
     # other
     parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")

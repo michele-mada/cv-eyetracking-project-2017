@@ -1,6 +1,6 @@
 import numpy as np
-from utils.screen_mapping.optimizer import compute_params
-from scipy.optimize import least_squares
+
+from utils.screen_mapping.mappers.optimizer import compute_params
 
 screen_x = 1366
 screen_y = 768

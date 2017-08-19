@@ -1,24 +1,22 @@
-from collections import namedtuple, deque
-import numpy as np
 import pickle
+from collections import namedtuple, deque
 from functools import reduce
 
+import numpy as np
 
 Rect = namedtuple("Rect", ["x", "y", "width", "height"])
 Point = namedtuple("Point", ["x", "y"])
+Observation = namedtuple("Observation", ["screen_point", "left_eyevectors", "right_eyevectors"])
 
 
 
 class Tracker:
 
-    def __init__(self, smooth_frames=5, smooth_weight_fun=lambda x: 1.0):
-        from utils.screen_mapping.map_function import calibration_params_vector_length
+    def __init__(self, model_class, smooth_frames=5, smooth_weight_fun=lambda x: 1.0):
         self.face = Face()
         self.smooth_weight_fun = smooth_weight_fun
-        self.cal_param_right = (np.ones((calibration_params_vector_length(),)),
-                                np.ones((calibration_params_vector_length(),)))
-        self.cal_param_left = (np.ones((calibration_params_vector_length(),)),
-                               np.ones((calibration_params_vector_length(),)))
+        self.cal_model_right = model_class()
+        self.cal_model_left = model_class()
         self.history = deque(maxlen=smooth_frames)
 
     def update(self, face):
@@ -40,18 +38,20 @@ class Tracker:
             return self.face
 
     def load_saved_cal_params(self):
-        from utils.gazetracker.calibrator import cal_param_storage_path
-        from utils.screen_mapping.map_function import current_profile
-        with open(cal_param_storage_path + "." + current_profile, "rb") as fp:
-            (self.cal_param_right, self.cal_param_left) = pickle.load(fp)
+        from utils.screen_mapping.calibrator import cal_param_storage_path
+        with open(cal_param_storage_path + ".bag", "rb") as fp:
+            observations = pickle.load(fp)
+            self.cal_model_right.before_training(observations)
+            self.cal_model_left.before_training(observations)
+            self.cal_model_right.train_from_data(observations, is_left=False)
+            self.cal_model_left.train_from_data(observations, is_left=True)
 
     def get_onscreen_gaze_mapping(self, smooth=False):
-        from utils.screen_mapping.map_function import map_function
         face = self.face
         if smooth:
             face = self.get_smooth_face()
-        right_eye_screen_pos = map_function(face.right_eye.eye_vector, *self.cal_param_right)
-        left_eye_screen_pos = map_function(face.left_eye.eye_vector, *self.cal_param_left)
+        right_eye_screen_pos = self.cal_model_right.map_point(face.right_eye.eye_vector)
+        left_eye_screen_pos = self.cal_model_left.map_point(face.left_eye.eye_vector)
         # TODO: combine the values?
         # TODO: apply head rotation offset
         return right_eye_screen_pos, left_eye_screen_pos

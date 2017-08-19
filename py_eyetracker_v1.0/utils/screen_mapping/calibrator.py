@@ -8,16 +8,14 @@ from skimage import exposure
 
 from utils.logging import LogMaster
 
+from classes import Observation
 from utils.camera.capture import WebcamVideoStream
 from utils.process_frame import process_frame
-from utils.screen_mapping.optimizer import compute_params
 
 from utils.eyecenter.hough import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
 from utils.eyecenter.int_proj import GeneralIntegralProjection
 from utils.histogram.lsh_equalization import lsh_equalization
-
-import utils.screen_mapping.map_function
 
 
 cal_param_storage_path = "calibration.dat"
@@ -54,13 +52,12 @@ def remove_outlier(fromlist, m=1):
     return list(filter(is_inlier, fromlist))
 
 
-class Calibrator(LogMaster):
+class CaptureCalibrator(LogMaster):
 
     def __init__(self, camera_port=0, algo="hough", equaliz="ah", mapping="quadratic", loglevel=logging.DEBUG):
         self.setLogger(self.__class__.__name__, loglevel)
         self.screen_points_captured = []
-        self.right_eye_vectors_captured = []
-        self.left_eye_vectors_captured = []
+        self.observations = []
         self.params_right_eye = None
         self.params_left_eye = None
         self.refresh()
@@ -87,7 +84,7 @@ class Calibrator(LogMaster):
     def work_thread(self, duration, wait_before, screen_point):
         self._traffic_man.acquire()
         time.sleep(wait_before)
-        self.logger.debug("Aquiring point #%d, %s" % (len(self.screen_points_captured), str(screen_point)))
+        self.logger.debug("Acquiring point #%d, %s" % (len(self.screen_points_captured), str(screen_point)))
         self.refresh()
         time_started = time.time()
         while time.time() - time_started < duration:
@@ -98,15 +95,13 @@ class Calibrator(LogMaster):
                 self.data_bag_right.append(np.array(face.right_eye.eye_vector).astype(np.float))
                 self.data_bag_left.append(np.array(face.left_eye.eye_vector).astype(np.float))
 
-        right_eye_vector = np.mean(remove_outlier(self.data_bag_right), axis=0)
-        left_eye_vector = np.mean(remove_outlier(self.data_bag_left), axis=0)
+        self.observations.append(Observation(screen_point=screen_point,
+                                             right_eyevectors=remove_outlier(self.data_bag_right),
+                                             left_eyevectors=remove_outlier(self.data_bag_left)))
 
-        self.logger.debug("Acquired point %s, right eye-vector: %s, left eye-vector: %s" %
-                          (str(screen_point), str(right_eye_vector), str(left_eye_vector)))
+        self.logger.debug("Acquired point %s" % (str(screen_point),))
 
         self.screen_points_captured.append(screen_point)
-        self.right_eye_vectors_captured.append(right_eye_vector)
-        self.left_eye_vectors_captured.append(left_eye_vector)
         self._traffic_man.release()
 
     ## Interface
@@ -118,17 +113,9 @@ class Calibrator(LogMaster):
         self._worker = Thread(target=self.work_thread,args=(duration, wait_before, screen_point))
         self._worker.start()
 
-    def compute_mapping_parameters(self):
-        utils.screen_mapping.map_function.current_profile = self.mapping
-        self.params_right_eye = tuple(compute_params(self.screen_points_captured, self.right_eye_vectors_captured))
-        self.params_left_eye = tuple(compute_params(self.screen_points_captured, self.left_eye_vectors_captured))
-        return self.params_right_eye, self.params_left_eye
-
     def save_mapping_parameters(self):
-        if self.params_right_eye is None or self.params_left_eye is None:
-            self.compute_mapping_parameters()
-        with open(cal_param_storage_path + "." + self.mapping, "wb") as fp:
-            pickle.dump((self.params_right_eye, self.params_left_eye), fp)
-        self.logger.debug("Calibration parameters (over)written to file %s" % cal_param_storage_path)
+        with open(cal_param_storage_path + ".bag", "wb") as fp:
+            pickle.dump(self.observations, fp)
+        self.logger.debug("Observation data (over)written to file %s" % cal_param_storage_path)
 
 
