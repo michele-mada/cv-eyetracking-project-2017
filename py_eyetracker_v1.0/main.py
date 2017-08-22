@@ -139,7 +139,10 @@ def live(cli, algo):
                       #smooth_weight_fun=lambda x: exp(-x*0.5)
                       )
     if cli.tracking:
-        trackboard = TrackingBoard()
+        override_screensize = None
+        if cli.override_screensize != "None":
+            override_screensize = tuple(map(int, cli.override_screensize.split("x")))
+        trackboard = TrackingBoard(override_screensize=override_screensize)
         tracker.load_saved_cal_params()
 
     while True:
@@ -218,6 +221,8 @@ def parsecli():
     parser.add_argument('-t', '--tracking', help='display the eye tracking whiteboard', action='store_true')
     parser.add_argument('-m', '--mapping-function', help='eye-vector to screen mapping function to use',
                         type=str, default="poly_quad", choices=mapper_implementations.keys())
+    parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your tracking board',
+                        type=str, default="None")
     # other
     parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")
