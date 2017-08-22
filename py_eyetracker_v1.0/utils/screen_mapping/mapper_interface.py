@@ -10,5 +10,5 @@ class MapperInterface:
     def train_from_data(self, observations, is_left=False):
         pass
 
-    def map_point(self, eyevector):
+    def map_point(self, eyevector: Point):
         return Point(0,0)

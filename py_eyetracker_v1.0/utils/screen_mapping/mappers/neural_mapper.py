@@ -48,7 +48,7 @@ class NeuralMapper(LogMaster, MapperInterface):
         #X_train = np.array(X_list)
         self.model.fit(X_train, np.array(y_list))
 
-    def map_point(self, eyevector):
+    def map_point(self, eyevector: Point):
         X_predict = self.scaler.transform(np.array(np.array([eyevector])))
         #X_predict = np.array(np.array([eyevector]))
         return Point(*list(self.model.predict(X_predict)[0]))

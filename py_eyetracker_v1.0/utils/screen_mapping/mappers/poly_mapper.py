@@ -36,7 +36,7 @@ class PolyMapper(LogMaster, MapperInterface):
         self.params_x, self.params_y = tuple(compute_params(screen_points, eye_vectors,
                                                             self.oneD_map_function, self.num_params))
 
-    def map_point(self, eyevector):
+    def map_point(self, eyevector: Point):
         x_screen = self.oneD_map_function(eyevector, self.params_x)
         y_screen = self.oneD_map_function(eyevector, self.params_y)
         return Point(x=x_screen, y=y_screen)
@@ -47,7 +47,7 @@ class PolyQuadMapper(PolyMapper):
     def __init__(self, loglevel=logging.DEBUG):
         super().__init__(6, loglevel)
 
-    def oneD_map_function(self, eye_vector, params):
+    def oneD_map_function(self, eye_vector: Point, params):
         (ex, ey) = eye_vector
         return params[0] + ex * params[1] + ey * params[2] + \
                ex * ey * params[3] + (ex ** 2) * params[4] + (ey ** 2) * params[5]
@@ -58,6 +58,6 @@ class PolyLinMapper(PolyMapper):
     def __init__(self, loglevel=logging.DEBUG):
         super().__init__(3, loglevel)
 
-    def oneD_map_function(self, eye_vector, params):
+    def oneD_map_function(self, eye_vector: Point, params):
         (ex, ey) = eye_vector
         return params[0] + ex * params[1] + ey * params[2]
