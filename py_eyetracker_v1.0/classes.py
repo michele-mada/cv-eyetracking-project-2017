@@ -1,4 +1,4 @@
-import pickle
+import dill as pickle
 from collections import namedtuple, deque
 from functools import reduce
 

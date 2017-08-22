@@ -2,7 +2,7 @@ from threading import Thread, Lock
 import time
 import cv2
 import numpy as np
-import pickle
+import dill as pickle
 import logging
 from skimage import exposure
 
