@@ -63,8 +63,8 @@ class Face:
         self.dlib68_points = np.zeros((68,2))
         self.right_eye = None
         self.left_eye = None
-        self.orientation = np.zeros((3,))
-        self.translation = np.zeros((3,))
+        self.orientation = np.zeros((3,1))
+        self.translation = np.zeros((3,1))
 
     @staticmethod
     def zero():
