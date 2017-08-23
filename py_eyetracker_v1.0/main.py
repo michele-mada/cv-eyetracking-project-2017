@@ -136,6 +136,7 @@ def live(cli, algo):
     cascade_files = get_cascade_files(cli)
     tracker = Tracker(mapper_implementations[cli.mapping_function],
                       smooth_frames=cli.smoothing,
+                      centroid_history_frames=cli.centroid_history,
                       #smooth_weight_fun=lambda x: exp(-x*0.5)
                       )
     if cli.tracking:
@@ -158,10 +159,9 @@ def live(cli, algo):
             tracker.update(face)
 
             if cli.tracking:
-                coord_right, coord_left = tracker.get_onscreen_gaze_mapping(smooth=True)
+                coord_right, coord_left, coord_centroid = tracker.get_onscreen_gaze_mapping(smooth=True)
                 print(coord_right, coord_left)
-                trackboard.update_right(coord_right)
-                trackboard.update_left(coord_left)
+                trackboard.update(coord_right, coord_left, coord_centroid)
 
         smooth_face = tracker.get_smooth_face()
         if smooth_face is not None and smooth_face.right_eye is not None and smooth_face.left_eye is not None:
@@ -226,6 +226,9 @@ def parsecli():
     parser.add_argument('--smoothing', metavar='int',
                         help='smooth the tracking data averaging across the last N frames',
                         type=int, default=1)
+    parser.add_argument('--centroid-history', metavar='int',
+                        help='compute the gaze centroid across the last N frames',
+                        type=int, default=5)
     # other
     parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")

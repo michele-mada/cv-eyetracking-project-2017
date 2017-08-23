@@ -12,12 +12,13 @@ Observation = namedtuple("Observation", ["screen_point", "left_eyevectors", "rig
 
 class Tracker:
 
-    def __init__(self, model_class, smooth_frames=5, smooth_weight_fun=lambda x: 1.0):
+    def __init__(self, model_class, smooth_frames=5, centroid_history_frames=5, smooth_weight_fun=lambda x: 1.0):
         self.face = Face()
         self.smooth_weight_fun = smooth_weight_fun
         self.cal_model_right = model_class()
         self.cal_model_left = model_class()
         self.history = deque(maxlen=smooth_frames)
+        self.centroid_history = deque(maxlen=centroid_history_frames*2)
 
     def update(self, face):
         assert(isinstance(face, Face))
@@ -46,15 +47,25 @@ class Tracker:
             self.cal_model_right.train_from_data(observations, is_left=False)
             self.cal_model_left.train_from_data(observations, is_left=True)
 
+    @property
+    def centroid(self):
+        if len(self.centroid_history) == 0:
+            return (0, 0)
+        x = sum(map(lambda pair: pair[0], self.centroid_history))
+        y = sum(map(lambda pair: pair[1], self.centroid_history))
+        return (x / len(self.centroid_history), y / len(self.centroid_history))
+
     def get_onscreen_gaze_mapping(self, smooth=False):
         face = self.face
         if smooth:
             face = self.get_smooth_face()
         right_eye_screen_pos = self.cal_model_right.map_point(face.right_eye.eye_vector)
         left_eye_screen_pos = self.cal_model_left.map_point(face.left_eye.eye_vector)
+        self.centroid_history.append(right_eye_screen_pos)
+        self.centroid_history.append(left_eye_screen_pos)
         # TODO: combine the values?
         # TODO: apply head rotation offset
-        return right_eye_screen_pos, left_eye_screen_pos
+        return right_eye_screen_pos, left_eye_screen_pos, self.centroid
 
 
 class Face:
