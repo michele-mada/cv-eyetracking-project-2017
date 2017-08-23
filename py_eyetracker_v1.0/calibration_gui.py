@@ -6,17 +6,19 @@ from matplotlib.widgets import Button
 
 from utils.screen_mapping.calibrator import CaptureCalibrator
 
-plt.rcParams['toolbar'] = 'None'
-
 
 def parsecli():
     parser = argparse.ArgumentParser(description="Calibration utility")
     parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your screen',
                         type=str, default="None")
+    parser.add_argument('-f', '--face-window', help='show face detection window', action='store_true')
     return parser.parse_args()
 
 
 cli = parsecli()
+calibrator = CaptureCalibrator(show_gui=cli.face_window)
+
+plt.rcParams['toolbar'] = 'None'
 plt.switch_backend('TKAgg')
 mng = plt.get_current_fig_manager()
 
@@ -28,7 +30,6 @@ else:
 
 print("Screen size: %dx%d" % (screen_x, screen_y))
 
-calibrator = CaptureCalibrator()
 
 #full-window mode
 #mng.window.state('zoomed')

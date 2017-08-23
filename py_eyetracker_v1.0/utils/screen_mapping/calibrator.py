@@ -11,6 +11,7 @@ from utils.logging import LogMaster
 from classes import Observation
 from utils.camera.capture import WebcamVideoStream
 from utils.process_frame import process_frame
+from utils.gui.visualization import draw_routine
 
 from utils.eyecenter.hough import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
@@ -54,8 +55,9 @@ def remove_outlier(fromlist, m=1):
 
 class CaptureCalibrator(LogMaster):
 
-    def __init__(self, camera_port=0, algo="hough", equaliz="ah", mapping="quadratic", loglevel=logging.DEBUG):
+    def __init__(self, camera_port=0, algo="hough", equaliz="ah", mapping="quadratic", show_gui=False, loglevel=logging.DEBUG):
         self.setLogger(self.__class__.__name__, loglevel)
+        self.show_gui = show_gui
         self.screen_points_captured = []
         self.observations = []
         self.params_right_eye = None
@@ -69,6 +71,8 @@ class CaptureCalibrator(LogMaster):
         self.camera = WebcamVideoStream(src=camera_port)
         self.camera.start()
 
+        self.detection()  # have the detection window appear
+
     ## Internal functions
 
     def setup_algo(self, algoname, equalizername):
@@ -81,6 +85,15 @@ class CaptureCalibrator(LogMaster):
         self.data_bag_left = []
         self.data_bag_right = []
 
+    def detection(self):
+        image_cv2 = self.camera.read()
+        image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
+        picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, self.algo, get_cascade_files())
+        if self.show_gui:
+            draw_routine(picture, face, not_eyes, "detection", draw_unicorn=False)
+            key = cv2.waitKey(1)
+        return picture, face, detect_string, not_eyes
+
     def work_thread(self, duration, wait_before, screen_point):
         self._traffic_man.acquire()
         time.sleep(wait_before)
@@ -88,9 +101,7 @@ class CaptureCalibrator(LogMaster):
         self.refresh()
         time_started = time.time()
         while time.time() - time_started < duration:
-            image_cv2 = self.camera.read()
-            image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
-            picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, self.algo, get_cascade_files())
+            picture, face, detect_string, not_eyes = self.detection()
             if face is not None and face.right_eye is not None and face.left_eye is not None:
                 self.data_bag_right.append(np.array(face.right_eye.eye_vector).astype(np.float))
                 self.data_bag_left.append(np.array(face.left_eye.eye_vector).astype(np.float))
@@ -99,7 +110,7 @@ class CaptureCalibrator(LogMaster):
                                              right_eyevectors=remove_outlier(self.data_bag_right),
                                              left_eyevectors=remove_outlier(self.data_bag_left)))
 
-        self.logger.debug("Acquired point %s" % (str(screen_point),))
+        self.logger.debug("Acquired point %s (%d data items)" % (str(screen_point), len(remove_outlier(self.data_bag_right))))
 
         self.screen_points_captured.append(screen_point)
         self._traffic_man.release()

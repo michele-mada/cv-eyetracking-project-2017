@@ -135,7 +135,7 @@ def live(cli, algo):
 
     cascade_files = get_cascade_files(cli)
     tracker = Tracker(mapper_implementations[cli.mapping_function],
-                      smooth_frames=4,
+                      smooth_frames=cli.smoothing,
                       #smooth_weight_fun=lambda x: exp(-x*0.5)
                       )
     if cli.tracking:
@@ -223,6 +223,9 @@ def parsecli():
                         type=str, default="poly_quad", choices=mapper_implementations.keys())
     parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your tracking board',
                         type=str, default="None")
+    parser.add_argument('--smoothing', metavar='int',
+                        help='smooth the tracking data averaging across the last N frames',
+                        type=int, default=1)
     # other
     parser.add_argument('--bioid-folder', metavar='BIOID_FOLDER', help='BioID face database folder, to use in the \"test\" mode',
                         type=str, default="../../BioID-FaceDatabase-V1.2")

@@ -5,6 +5,7 @@ from skimage.feature import corner_harris, corner_peaks
 from skimage.filters import threshold_otsu
 import matplotlib.pyplot as plt
 from skimage import exposure
+from skimage import feature
 
 from classes import Eye, Point
 from utils.eyecorners import find_eye_corners
@@ -31,9 +32,10 @@ class PyHoughEyecenter(EyeFeaturesExtractor):
             eye_image = exposure.equalize_hist(eye_image)
         # apply a threshold to the image
         try:
-            thresh_eyeball = threshold_otsu(eye_image) * 0.5
+            thresh_eyeball = threshold_otsu(eye_image) * 0.3
             thresh_eyecorner = threshold_otsu(eye_image)
             eye_binary_ball = eye_image < thresh_eyeball
+            #eye_binary_ball = feature.canny(eye_binary_ball, sigma=0.001)
             eye_binary_corner = eye_image < thresh_eyecorner
         except Exception:
             print("\nerror shape:")
@@ -46,7 +48,7 @@ class PyHoughEyecenter(EyeFeaturesExtractor):
         radii = []
 
         base_width = eye_object.area.width/2.0
-        hough_radii = np.arange(base_width/4.0, base_width/3.0, 2)
+        hough_radii = np.arange(eye_object.area.height*0.25,eye_object.area.height*0.7, 1)
 
         hough_res = hough_circle(eye_binary_ball, hough_radii)
         _accums, cx, cy, _radii = hough_circle_peaks(hough_res, hough_radii, total_num_peaks=1)
