@@ -28,6 +28,7 @@ def draw_dot(image, point, color):
 def draw_gaze_vector(image, face: Face, length=500.0):
     camera_matrix = camera_matrix_from_picture_shape(image.shape)
     dist_coeffs = get_dist_coeffs()
+    #si potrebbe togliere e usare face.head_pose anche se è specchiato
     (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, length)]),
                                                      face.orientation,
                                                      face.translation,

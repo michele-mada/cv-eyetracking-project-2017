@@ -161,7 +161,8 @@ def live(cli, algo):
             if cli.tracking:
                 coord_right, coord_left, coord_centroid = tracker.get_onscreen_gaze_mapping(smooth=True)
                 print(coord_right, coord_left)
-                trackboard.update(coord_right, coord_left, coord_centroid)
+                head_pose = face.head_pose
+                trackboard.update(coord_right, coord_left, coord_centroid, head_pose)
 
         smooth_face = tracker.get_smooth_face()
         if smooth_face is not None and smooth_face.right_eye is not None and smooth_face.left_eye is not None:

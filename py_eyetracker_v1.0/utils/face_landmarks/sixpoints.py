@@ -34,4 +34,11 @@ def six_points(dlib_68points, image_shape):
 
     (success, rotation_vector, translation_vector) = cv2.solvePnP(model_points, image_points, camera_matrix,
                                                                   dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
-    return rotation_vector, translation_vector
+    
+    (nose_end_point2D, jacobian) = cv2.projectPoints(np.array([(0.0, 0.0, 500.0)]),
+                                                     rotation_vector,
+                                                     translation_vector,
+                                                     camera_matrix, dist_coeffs)
+    head_pose = ((-(nose_end_point2D[0][0][0]- image_shape[1]/2) + image_shape[1]/2)/image_shape[1], nose_end_point2D[0][0][1]/image_shape[0])
+
+    return rotation_vector, translation_vector, head_pose

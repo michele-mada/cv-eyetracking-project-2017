@@ -74,6 +74,7 @@ class Face:
         self.dlib68_points = np.zeros((68,2))
         self.right_eye = None
         self.left_eye = None
+        self.head_pose = None
         self.orientation = np.zeros((3,1))
         self.translation = np.zeros((3,1))
 
@@ -90,7 +91,7 @@ class Face:
 
     def __str__(self):
         return "Face(points: %s\nright_eye: %s\nleft_eye: %s\norientation: %s\ntranslation: %s\n)" % \
-               (str(self.dlib68_points), str(self.right_eye), str(self.left_eye), str(self.orientation), str(self.translation))
+               (str(self.dlib68_points), str(self.right_eye), str(self.left_eye), str(self.head_pose), str(self.orientation), str(self.translation))
 
     def __add__(self, other):
         if not isinstance(other, Face):

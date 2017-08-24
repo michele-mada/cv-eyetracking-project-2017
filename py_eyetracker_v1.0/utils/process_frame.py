@@ -50,7 +50,7 @@ def eye_features_extraction_step(picture, right_eye, left_eye, algo):
 
 
 def face_spatial_tracking_step(face, picture):
-    face.orientation, face.translation = six_points(face.dlib68_points, picture.shape)
+    face.orientation, face.translation, face.head_pose = six_points(face.dlib68_points, picture.shape)
 
 
 def process_frame(image_cv2format, algo, cascade_files):
