@@ -159,12 +159,12 @@ def live(cli, algo):
             tracker.update(face)
 
             if cli.tracking:
-                coord_right, coord_left, coord_centroid = tracker.get_onscreen_gaze_mapping(smooth=True)
+                coord_right, coord_left, coord_centroid = tracker.get_onscreen_gaze_mapping()
                 print(coord_right, coord_left)
-                head_pose = face.head_pose
+                head_pose = tracker.face.head_pose
                 trackboard.update(coord_right, coord_left, coord_centroid, head_pose)
 
-        smooth_face = tracker.get_smooth_face()
+        smooth_face = tracker.face
         if smooth_face is not None and smooth_face.right_eye is not None and smooth_face.left_eye is not None:
             #print(smooth_face)
             draw_routine(picture, smooth_face, not_eyes, "detection", draw_unicorn=cli.unicorn)
