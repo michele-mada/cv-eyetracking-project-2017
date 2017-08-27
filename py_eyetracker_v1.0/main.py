@@ -46,7 +46,6 @@ def get_cascade_files(cli):
 
 def one_shot(cli, algo):
     image_cv2 = cv2.imread(cli.file)
-    image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_RGB2GRAY)
 
     if cli.debug:
         fig2, axes_2 = algo.create_debug_figure()
@@ -54,7 +53,7 @@ def one_shot(cli, algo):
 
     cascade_files = get_cascade_files(cli)
 
-    picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
+    picture, face, detect_string, not_eyes = process_frame(image_cv2, algo, cascade_files)
 
     print("Eye detection successful (%s)" % detect_string)
     print("Eyes (R,L):\n  %s,\n  %s" % (str(face.right_eye), str(face.left_eye)))
@@ -96,7 +95,7 @@ def test_run(cli, algo):
     # run the tests
     print("Testing against %d faces" % len(facedb.faces))
     for n, bioid_face in enumerate(facedb.faces):
-        picture, face, detect_string, not_eyes = process_frame(bioid_face.load_cv2(), algo, cascade_files)
+        picture, face, detect_string, not_eyes = process_frame(bioid_face.load_cv2(), algo, cascade_files, already_grayscale=True)
         if face is None:
             missed_detections += 1
         else:
@@ -148,12 +147,11 @@ def live(cli, algo):
 
     while True:
         image_cv2 = camera.read()
-        image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
 
         if cli.debug:
             algo.clean_debug_axes()
 
-        picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, algo, cascade_files)
+        picture, face, detect_string, not_eyes = process_frame(image_cv2, algo, cascade_files)
 
         if face is not None and face.right_eye is not None and face.left_eye is not None:
             tracker.update(face)

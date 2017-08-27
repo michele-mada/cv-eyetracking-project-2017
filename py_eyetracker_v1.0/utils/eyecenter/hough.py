@@ -32,7 +32,7 @@ class PyHoughEyecenter(EyeFeaturesExtractor):
             eye_image = exposure.equalize_hist(eye_image)
         # apply a threshold to the image
         try:
-            thresh_eyeball = threshold_otsu(eye_image) * 0.3
+            thresh_eyeball = threshold_otsu(eye_image) * 0.35
             thresh_eyecorner = threshold_otsu(eye_image)
             eye_binary_ball = eye_image < thresh_eyeball
             #eye_binary_ball = feature.canny(eye_binary_ball, sigma=0.001)

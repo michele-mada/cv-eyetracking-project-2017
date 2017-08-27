@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 from skimage import img_as_float, img_as_ubyte
 
 from classes import Face
@@ -24,9 +25,17 @@ def cropped_rect(image, rect):
     return np.copy(image[y1:y1+height,x1:x1+width])
 
 
+def rgb_to_single_channel(image_cv2format_rgb):
+    # new_img = cv2.cvtColor(image_cv2format_rgb, cv2.COLOR_RGB2YUV)
+    # return new_img[:,:,1]
+    new_img = cv2.cvtColor(image_cv2format_rgb, cv2.COLOR_RGB2GRAY)
+    return new_img
+
+
 def image_preprocessing_step(image_cv2format, algo):
     picture_float = img_as_float(image_cv2format)
     picture_float_equalized = algo.equalization(picture_float)
+    #picture_float_equalized = picture_float
     image_cv2format_equalized = img_as_ubyte(picture_float_equalized)
     picture = picture_float_equalized
     return picture, image_cv2format, image_cv2format_equalized
@@ -53,7 +62,7 @@ def face_spatial_tracking_step(face, picture):
     face.orientation, face.translation, face.head_pose = six_points(face.dlib68_points, picture.shape)
 
 
-def process_frame(image_cv2format, algo, cascade_files):
+def process_frame(image_cv2format, algo, cascade_files, already_grayscale=False):
     """
     Preprocess and image and extract useful features
     :param image_cv2format: cv2 image (numpy 2d array of ubyte)
@@ -69,7 +78,11 @@ def process_frame(image_cv2format, algo, cascade_files):
     new_face = Face()
 
     # pre-processing
-    picture, image_cv2format, image_cv2format_equalized = image_preprocessing_step(image_cv2format, algo)
+    if not already_grayscale:
+        single_channel = rgb_to_single_channel(image_cv2format)
+    else:
+        single_channel = image_cv2format
+    picture, image_cv2format, image_cv2format_equalized = image_preprocessing_step(single_channel, algo)
 
     # eye area detection
     success, detect_method, eyes, points68 = eye_area_detection_step(image_cv2format, image_cv2format_equalized)

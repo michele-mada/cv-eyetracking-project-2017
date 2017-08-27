@@ -87,8 +87,7 @@ class CaptureCalibrator(LogMaster):
 
     def detection(self):
         image_cv2 = self.camera.read()
-        image_cv2_gray = cv2.cvtColor(image_cv2, cv2.COLOR_BGR2GRAY)
-        picture, face, detect_string, not_eyes = process_frame(image_cv2_gray, self.algo, get_cascade_files())
+        picture, face, detect_string, not_eyes = process_frame(image_cv2, self.algo, get_cascade_files())
         if self.show_gui:
             draw_routine(picture, face, not_eyes, "detection", draw_unicorn=False)
             key = cv2.waitKey(1)
