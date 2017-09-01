@@ -155,10 +155,12 @@ def live(cli, algo):
 
         if face is not None and face.right_eye is not None and face.left_eye is not None:
             tracker.update(face)
+            print("right eyevector:", tracker.face.normalized_right_eye_vector)
+            print("left eyevector:", tracker.face.normalized_left_eye_vector)
 
             if cli.tracking:
                 coord_right, coord_left, coord_centroid = tracker.get_onscreen_gaze_mapping()
-                print(coord_right, coord_left)
+                print("right, left: ", coord_right, coord_left)
                 head_pose = tracker.face.head_pose
                 trackboard.update(coord_right, coord_left, coord_centroid, head_pose)
 

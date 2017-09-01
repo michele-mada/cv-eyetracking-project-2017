@@ -22,9 +22,9 @@ def compute_params(screen_points, eye_vectors, mapfun, num_params):
                                  zip(y_screen_points, eye_vectors))))
 
     optimization_res_x = least_squares(error_function_x,
-                                       np.ones((num_params,)))
+                                       np.ones(num_params))
     optimization_res_y = least_squares(error_function_y,
-                                       np.ones((num_params,)))
+                                       np.ones(num_params))
 
     params_x = optimization_res_x.x
     params_y = optimization_res_y.x

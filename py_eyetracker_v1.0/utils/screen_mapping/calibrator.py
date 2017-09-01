@@ -102,8 +102,10 @@ class CaptureCalibrator(LogMaster):
         while time.time() - time_started < duration:
             picture, face, detect_string, not_eyes = self.detection()
             if face is not None and face.right_eye is not None and face.left_eye is not None:
-                self.data_bag_right.append(np.array(face.right_eye.eye_vector).astype(np.float))
-                self.data_bag_left.append(np.array(face.left_eye.eye_vector).astype(np.float))
+                self.data_bag_right.append(
+                    np.array(face.normalized_right_eye_vector).astype(np.float))
+                self.data_bag_left.append(
+                    np.array(face.normalized_left_eye_vector).astype(np.float))
 
         self.observations.append(Observation(screen_point=screen_point,
                                              right_eyevectors=remove_outlier(self.data_bag_right),

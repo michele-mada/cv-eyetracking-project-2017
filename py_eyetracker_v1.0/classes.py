@@ -2,6 +2,7 @@ import dill as pickle
 from collections import namedtuple, deque
 from functools import reduce
 
+from math import cos, sqrt
 import numpy as np
 
 
@@ -96,8 +97,8 @@ class Tracker:
 
     def get_onscreen_gaze_mapping(self):
         face = self.face
-        right_eye_screen_pos = self.cal_model_right.map_point(face.right_eye.eye_vector)
-        left_eye_screen_pos = self.cal_model_left.map_point(face.left_eye.eye_vector)
+        right_eye_screen_pos = self.cal_model_right.map_point(face.normalized_right_eye_vector)
+        left_eye_screen_pos = self.cal_model_left.map_point(face.normalized_left_eye_vector)
         self.centroid_history.append(right_eye_screen_pos)
         self.centroid_history.append(left_eye_screen_pos)
         return right_eye_screen_pos, left_eye_screen_pos, self.centroid
@@ -135,6 +136,18 @@ class Face:
         """
         self.right_eye.force_int()
         self.left_eye.force_int()
+
+    @property
+    def normalized_right_eye_vector(self):
+        ev = self.right_eye.eye_vector
+        return Point(ev.x / cos(self.orientation[1]),
+                     ev.y / cos(self.orientation[0]))
+
+    @property
+    def normalized_left_eye_vector(self):
+        ev = self.left_eye.eye_vector
+        return Point(ev.x / cos(self.orientation[1]),
+                     ev.y / cos(self.orientation[0]))
 
     # Implement some Python builtin operations
 
@@ -248,9 +261,16 @@ class Eye:
         return Point(self.area.width / 2, self.area.height / 2)
 
     @property
+    def eye_major_diameter(self):
+        return sqrt((self.inner_corner_relative.x - self.outer_corner_relative.x) ** 2 +
+                    (self.inner_corner_relative.y - self.outer_corner_relative.y) ** 2)
+
+    @property
     def eye_vector(self):
-        return Point(self.inner_corner_relative[0] - self.pupil_relative[0],
-                     self.inner_corner_relative[1] - self.pupil_relative[1])
+        diameter = self.eye_major_diameter
+        x_ev = (self.inner_corner_relative[0] - self.pupil_relative[0]) / diameter
+        y_ev = (self.inner_corner_relative[1] - self.pupil_relative[1]) / diameter
+        return Point(x_ev, y_ev)
 
     def set_leftmost_corner(self, point):
         if self.is_right:
