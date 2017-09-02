@@ -17,7 +17,7 @@ from utils.eyecenter.hough import PyHoughEyecenter
 from utils.eyecenter.timm.timm_and_barth import TimmAndBarth
 from utils.eyecenter.int_proj import GeneralIntegralProjection
 from utils.histogram.lsh_equalization import lsh_equalization
-
+from utils.screen_mapping.mappers.fuzzy_mapper import FuzzyMapper
 
 cal_param_storage_path = "calibration.dat"
 
@@ -129,5 +129,37 @@ class CaptureCalibrator(LogMaster):
         with open(cal_param_storage_path + ".bag", "wb") as fp:
             pickle.dump(self.observations, fp)
         self.logger.debug("Observation data (over)written to file %s" % cal_param_storage_path)
+        self.observations = []
+
+    def evaluate_calibration(self, distance):
+        print(self.observations)
+        from utils.screen_mapping.calibrator import cal_param_storage_path
+        with open(cal_param_storage_path + ".bag", "rb") as fp:
+            stored_observations = pickle.load(fp)
+            mapper_right = FuzzyMapper()
+            mapper_left = FuzzyMapper()
+            mapper_right.train_from_data(stored_observations, is_left=False)
+            mapper_left.train_from_data(stored_observations, is_left=True)
+            mean_errors=[]
+            for obs in self.observations:
+                assert(isinstance(obs, Observation))
+                right_vectors = obs.right_eyevectors
+                left_vectors = obs.left_eyevectors
+                right_eye_screen_pos = mapper_right.map_point(np.mean(right_vectors, axis=0))
+                left_eye_screen_pos = mapper_left.map_point(np.mean(left_vectors, axis=0))
+                true_screen_point = np.array(obs.screen_point)
+                print(true_screen_point)
+                estimated_screen_point = np.mean([right_eye_screen_pos, left_eye_screen_pos], axis=0)
+                print(estimated_screen_point)
+                error = np.linalg.norm(estimated_screen_point-true_screen_point)
+                print(error)
+                mean_errors.append(error)
+            mean_error = np.mean(mean_errors)
+            print(mean_error)
+            mean_angular_error = np.arctan(mean_error/distance)
+            
+            
+        
+
 
 

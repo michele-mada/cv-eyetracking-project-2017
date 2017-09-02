@@ -12,6 +12,7 @@ def parsecli():
     parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your screen',
                         type=str, default="None")
     parser.add_argument('-f', '--face-window', help='show face detection window', action='store_true')
+    parser.add_argument('-t', '--test', help='run a second time to test accuracy', type=int, default=0) 
     return parser.parse_args()
 
 
@@ -65,8 +66,21 @@ def start_calibration(event):
         fig.canvas.draw()
         calibrator.capture_point(interval * 1.2, 1, centers[index[i]])
         plt.pause(interval + 1)
-    gaze_target.set_visible(False)
     calibrator.save_mapping_parameters()
+    if(cli.test):
+        distance_from_screen = cli.test
+        print(distance_from_screen)
+        for i in range(num_targets):
+            gaze_target.set_color('blue')
+            gaze_target.center = centers[index[i]]
+            fig.canvas.draw()
+            calibrator.capture_point(interval * 1.2, 1, centers[index[i]])
+            plt.pause(interval + 1)
+        calibrator.evaluate_calibration(distance_from_screen)
+    gaze_target.set_visible(False)
+            
+
+    
 
 fig = plt.gcf()
 ax = fig.gca()
