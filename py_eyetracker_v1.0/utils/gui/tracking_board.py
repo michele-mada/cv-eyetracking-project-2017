@@ -2,12 +2,15 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import deque
+from utils.gui.scrolling import Scroller
+
 
 
 class TrackingBoard:
 
     dot_radius = 4
     wintitle = "trackingboard"
+    scroller = Scroller()
 
     def __init__(self, override_screensize=None):
         self.leftpos = (0, 0)
@@ -30,8 +33,16 @@ class TrackingBoard:
         self.rightpos = right
         self.leftpos = left
         self.centroid = centroid
+        centroid_array = np.array(centroid)
+        if centroid_array[0] > self.screen_size[1]*2/3:
+            if centroid_array[1] < self.screen_size[0]/3:
+                self.scroller.scrolldown()
+            else:
+                if centroid_array[1] > self.screen_size[0]*2/3:
+                    self.scroller.scrollup()
         self.head_pose = head_pose
         self.draw_dots()
+        
 
     def draw_dots(self):
         black = np.ones((self.screen_size[1], self.screen_size[0]), dtype=np.ubyte)
