@@ -1,31 +1,18 @@
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-from collections import deque
-from utils.gui.scrolling import Scroller
-
 
 
 class TrackingBoard:
 
     dot_radius = 4
     wintitle = "trackingboard"
-    scroller = Scroller()
 
-    def __init__(self, override_screensize=None):
+    def __init__(self, screensize):
         self.leftpos = (0, 0)
         self.rightpos = (0, 0)
         self.centroid = (0, 0)
-        if override_screensize:
-            self.screen_size = override_screensize
-        else:
-            mng = plt.get_current_fig_manager()
-            self.screen_size = (
-                mng.window.winfo_screenwidth(),
-                mng.window.winfo_screenheight(),
-            )
+        self.screen_size = screensize
         print(self.screen_size)
-        plt.close()
         cv2.namedWindow(self.wintitle)
         cv2.setWindowProperty(self.wintitle, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
@@ -33,16 +20,8 @@ class TrackingBoard:
         self.rightpos = right
         self.leftpos = left
         self.centroid = centroid
-        centroid_array = np.array(centroid)
-        if centroid_array[0] > self.screen_size[1]*2/3:
-            if centroid_array[1] < self.screen_size[0]/3:
-                self.scroller.scrolldown()
-            else:
-                if centroid_array[1] > self.screen_size[0]*2/3:
-                    self.scroller.scrollup()
         self.head_pose = head_pose
         self.draw_dots()
-        
 
     def draw_dots(self):
         black = np.ones((self.screen_size[1], self.screen_size[0]), dtype=np.ubyte)

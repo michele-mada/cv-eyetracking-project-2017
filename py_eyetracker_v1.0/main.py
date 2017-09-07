@@ -23,6 +23,10 @@ from utils.bioID import BioIDFaceDatabase
 
 from utils.gui.tracking_board import TrackingBoard
 from utils.screen_mapping import mapper_implementations
+from utils.screen_mapping.screen_tools import get_screen_size
+from utils.screen_mapping.drive_scrolling import drive_scrolling
+
+from app_control import app_controllers
 
 
 algos = {
@@ -121,44 +125,58 @@ def test_run(cli, algo):
 
 
 def live(cli, algo):
+    # initialize asynchronus camera polling system
     camera = WebcamVideoStream(src=cli.camera_port,
                                debug=cli.debug,
                                contrast=None if cli.contrast == "None" else float(cli.contrast),
                                saturation=None if cli.saturation == "None" else float(cli.saturation)
                                )
+    # get the correct screen size
+    override_screensize = None
+    if cli.override_screensize != "None":
+        override_screensize = tuple(map(int, cli.override_screensize.split("x")))
+    screensize = get_screen_size(override_screensize=override_screensize)
+    # initialize the scroll-controlled application
+    app = app_controllers[cli.app]()
+    # start capturing
     camera.start()
-    plt.ion()
-    if cli.debug:
+
+    # initialize matplotlib, needed for debug purposes
+    if not cli.quiet:
+        plt.ion()
+    if cli.debug and not cli.quiet:
         fig2, axes_2 = algo.create_debug_figure()
         algo.setup_debug_parameters(True, axes_2)
 
+    # load haar cascade files (note: haar cascades are disabled right now)
     cascade_files = get_cascade_files(cli)
+    # initialize the tracker
     tracker = Tracker(mapper_implementations[cli.mapping_function],
                       smooth_frames=cli.smoothing,
                       centroid_history_frames=cli.centroid_history,
                       #smooth_weight_fun=lambda x: exp(-x*0.5)
                       )
+    # initialize the tracking blackboard
     if cli.tracking:
-        override_screensize = None
-        if cli.override_screensize != "None":
-            override_screensize = tuple(map(int, cli.override_screensize.split("x")))
-        trackboard = TrackingBoard(override_screensize=override_screensize)
+        if not cli.quiet:
+            trackboard = TrackingBoard(screensize=screensize)
         tracker.load_saved_cal_params()
 
     while True:
         image_cv2 = camera.read()
 
-        if cli.debug:
+        if cli.debug and not cli.quiet:
             algo.clean_debug_axes()
 
         picture, face, detect_string, not_eyes = process_frame(image_cv2, algo, cascade_files)
 
         if face is not None and face.right_eye is not None and face.left_eye is not None:
             tracker.update(face)
+            drive_scrolling(tracker, app, screensize)
             print("right eyevector:", tracker.face.normalized_right_eye_vector)
             print("left eyevector:", tracker.face.normalized_left_eye_vector)
 
-            if cli.tracking:
+            if cli.tracking and not cli.quiet:
                 coord_right, coord_left, coord_centroid = tracker.get_onscreen_gaze_mapping()
                 print("right, left: ", coord_right, coord_left)
                 head_pose = tracker.face.head_pose
@@ -166,8 +184,8 @@ def live(cli, algo):
 
         smooth_face = tracker.face
         if smooth_face is not None and smooth_face.right_eye is not None and smooth_face.left_eye is not None:
-            #print(smooth_face)
-            draw_routine(picture, smooth_face, not_eyes, "detection", draw_unicorn=cli.unicorn)
+            if not cli.quiet:
+                draw_routine(picture, smooth_face, not_eyes, "detection", draw_unicorn=cli.unicorn)
 
         key = cv2.waitKey(1)
         if key == 27: break
@@ -175,7 +193,8 @@ def live(cli, algo):
         if cli.debug:
             plt.pause(0.01)
 
-    cv2.destroyAllWindows()  # I like the name of this function
+    if not cli.quiet:
+        cv2.destroyAllWindows()  # I like the name of this function
     camera.stop()
 
 
@@ -200,6 +219,9 @@ def parsecli():
     # main generic parameters
     parser.add_argument('file', help='filename of the picture; - for webcam; \"test\" to run a performance test', type=str)
     parser.add_argument('-d', '--debug', help='enable debug mode', action='store_true')
+    parser.add_argument('-A', '--app', help='drive the scrolling of an application. Default is None.', type=str, default="None", choices=app_controllers.keys())
+    parser.add_argument('-q', '--quiet', help='suppress all windows, except the application one (see -A)', action='store_true')
+
     # haar cascade detection parameters
     parser.add_argument('--eye-cascade-file', help='path to the .xml file with the eye-detection haar cascade',
                         type=str, default="../haarcascades/haarcascade_righteye_2splits.xml")
