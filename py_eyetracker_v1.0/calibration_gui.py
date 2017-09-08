@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib.widgets import Button
 
 from utils.screen_mapping.calibrator import CaptureCalibrator
+from utils.screen_mapping import mapper_implementations
 
 
 def parsecli():
@@ -13,6 +14,8 @@ def parsecli():
                         type=str, default="None")
     parser.add_argument('-f', '--face-window', help='show face detection window', action='store_true')
     parser.add_argument('-t', '--test', help='run a second time to test accuracy', type=int, default=0) 
+    parser.add_argument('-m', '--mapping-function', help='eye-vector to screen mapping function to use',
+                        type=str, default="poly_quad", choices=mapper_implementations.keys())
     return parser.parse_args()
 
 
@@ -76,7 +79,7 @@ def start_calibration(event):
             fig.canvas.draw()
             calibrator.capture_point(interval * 1.2, 1, centers[index[i]])
             plt.pause(interval + 1)
-        calibrator.evaluate_calibration(distance_from_screen)
+        calibrator.evaluate_calibration(distance_from_screen,mapper_implementations[cli.mapping_function])
     gaze_target.set_visible(False)
             
 

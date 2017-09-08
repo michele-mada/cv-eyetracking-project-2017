@@ -131,13 +131,13 @@ class CaptureCalibrator(LogMaster):
         self.logger.debug("Observation data (over)written to file %s" % cal_param_storage_path)
         self.observations = []
 
-    def evaluate_calibration(self, distance):
+    def evaluate_calibration(self, distance, mapping_method):
         print(self.observations)
         from utils.screen_mapping.calibrator import cal_param_storage_path
         with open(cal_param_storage_path + ".bag", "rb") as fp:
             stored_observations = pickle.load(fp)
-            mapper_right = FuzzyMapper()
-            mapper_left = FuzzyMapper()
+            mapper_right = mapping_method()
+            mapper_left = mapping_method()
             mapper_right.train_from_data(stored_observations, is_left=False)
             mapper_left.train_from_data(stored_observations, is_left=True)
             mean_errors=[]
@@ -157,6 +157,8 @@ class CaptureCalibrator(LogMaster):
             mean_error = np.mean(mean_errors)
             print(mean_error)
             mean_angular_error = np.arctan(mean_error/distance)
+            print("mean_angular_error")
+            print(mean_angular_error)
             
             
         
