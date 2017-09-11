@@ -3,7 +3,6 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.widgets import Button
-
 from utils.screen_mapping.calibrator import CaptureCalibrator
 from utils.screen_mapping import mapper_implementations
 
@@ -13,9 +12,7 @@ def parsecli():
     parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your screen',
                         type=str, default="None")
     parser.add_argument('-f', '--face-window', help='show face detection window', action='store_true')
-    parser.add_argument('-t', '--test', help='run a second time to test accuracy', type=int, default=0) 
-    parser.add_argument('-m', '--mapping-function', help='eye-vector to screen mapping function to use',
-                        type=str, default="poly_quad", choices=mapper_implementations.keys())
+    parser.add_argument('-t', '--test', help='run a second time to test accuracy', type=int, default=0)
     return parser.parse_args()
 
 
@@ -41,6 +38,7 @@ print("Screen size: %dx%d" % (screen_x, screen_y))
 #full-screen mode
 mng.full_screen_toggle()
 
+
 num_targets = 9
 radius = 30
 padding = 20
@@ -53,12 +51,12 @@ centers = [(radius + padding, screen_y - radius - padding),
            (screen_x - radius - padding, screen_y/2),
            (radius + padding, radius + padding),
            (screen_x/2, radius + padding),
-           (screen_x - radius - padding, radius + padding)]
+           (screen_x - radius - padding, radius + padding)
+           ]
 
 index = np.random.permutation(num_targets)
 
 gaze_target = plt.Circle(centers[index[0]], 20, color='r')
-
 
 def start_calibration(event):
     axbutton.set_visible(False)
@@ -71,7 +69,13 @@ def start_calibration(event):
         plt.pause(interval + 1)
     calibrator.save_mapping_parameters()
     if(cli.test):
+        #convert distance from cm to pixels
         distance_from_screen = cli.test
+        distance_inch = distance_from_screen/2.54
+        diagonal_pixel = np.sqrt(screen_x**2 + screen_y**2)
+        diagonal_inch = 15.5 #size of my screen
+        ppi = diagonal_pixel/diagonal_inch
+        distance_pixel = distance_inch*ppi
         print(distance_from_screen)
         for i in range(num_targets):
             gaze_target.set_color('blue')
@@ -79,8 +83,21 @@ def start_calibration(event):
             fig.canvas.draw()
             calibrator.capture_point(interval * 1.2, 1, centers[index[i]])
             plt.pause(interval + 1)
-        calibrator.evaluate_calibration(distance_from_screen,mapper_implementations[cli.mapping_function])
+        fuzzy_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["fuzzy"])
+        quad_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["poly_quad"])
+        lin_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["poly_lin"])
+        #neural_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["neural"])
     gaze_target.set_visible(False)
+
+    for i in range(num_targets):
+        estimatedf = plt.Circle(fuzzy_points[i], 10, color='r')
+        ax.add_artist(estimatedf)
+        estimatedq = plt.Circle(quad_points[i], 10, color='blue')
+        ax.add_artist(estimatedq)
+        estimatedl = plt.Circle(lin_points[i], 10, color='g')
+        ax.add_artist(estimatedl)
+        #estimatedn = plt.Circle(neural_points[i], 10, color='k')
+        #ax.add_artist(estimatedn)
             
 
     

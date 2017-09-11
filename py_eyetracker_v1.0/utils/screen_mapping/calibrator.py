@@ -132,7 +132,6 @@ class CaptureCalibrator(LogMaster):
         self.observations = []
 
     def evaluate_calibration(self, distance, mapping_method):
-        print(self.observations)
         from utils.screen_mapping.calibrator import cal_param_storage_path
         with open(cal_param_storage_path + ".bag", "rb") as fp:
             stored_observations = pickle.load(fp)
@@ -140,7 +139,9 @@ class CaptureCalibrator(LogMaster):
             mapper_left = mapping_method()
             mapper_right.train_from_data(stored_observations, is_left=False)
             mapper_left.train_from_data(stored_observations, is_left=True)
-            mean_errors=[]
+            mean_errors_left=[]
+            mean_errors_right=[]
+            screen_pos = []
             for obs in self.observations:
                 assert(isinstance(obs, Observation))
                 right_vectors = obs.right_eyevectors
@@ -148,17 +149,24 @@ class CaptureCalibrator(LogMaster):
                 right_eye_screen_pos = mapper_right.map_point(np.mean(right_vectors, axis=0))
                 left_eye_screen_pos = mapper_left.map_point(np.mean(left_vectors, axis=0))
                 true_screen_point = np.array(obs.screen_point)
-                print(true_screen_point)
+                
                 estimated_screen_point = np.mean([right_eye_screen_pos, left_eye_screen_pos], axis=0)
-                print(estimated_screen_point)
-                error = np.linalg.norm(estimated_screen_point-true_screen_point)
-                print(error)
-                mean_errors.append(error)
-            mean_error = np.mean(mean_errors)
-            print(mean_error)
-            mean_angular_error = np.arctan(mean_error/distance)
+                screen_pos.append(estimated_screen_point)
+                
+                error_left = np.linalg.norm(left_eye_screen_pos-true_screen_point)
+                error_right = np.linalg.norm(right_eye_screen_pos-true_screen_point)
+                
+                mean_errors_left.append(error_left)
+                mean_errors_right.append(error_right)
+            mean_error_left = np.mean(mean_errors_left)
+            mean_error_right = np.mean(mean_errors_right)
+           
+            mean_error = (mean_error_left+mean_error_right)/2
+            mean_angular_error = np.degrees(np.arctan(mean_error/distance))
+            print(mapping_method)
             print("mean_angular_error")
             print(mean_angular_error)
+            return screen_pos
             
             
         
