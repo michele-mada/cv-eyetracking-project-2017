@@ -86,7 +86,7 @@ def start_calibration(event):
         fuzzy_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["fuzzy"])
         quad_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["poly_quad"])
         lin_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["poly_lin"])
-        #neural_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["neural"])
+        neural_points = calibrator.evaluate_calibration(distance_pixel,mapper_implementations["neural"])
     gaze_target.set_visible(False)
 
     for i in range(num_targets):
@@ -96,8 +96,8 @@ def start_calibration(event):
         ax.add_artist(estimatedq)
         estimatedl = plt.Circle(lin_points[i], 10, color='g')
         ax.add_artist(estimatedl)
-        #estimatedn = plt.Circle(neural_points[i], 10, color='k')
-        #ax.add_artist(estimatedn)
+        estimatedn = plt.Circle(neural_points[i], 10, color='k')
+        ax.add_artist(estimatedn)
             
 
     

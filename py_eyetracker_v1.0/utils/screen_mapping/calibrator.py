@@ -137,6 +137,8 @@ class CaptureCalibrator(LogMaster):
             stored_observations = pickle.load(fp)
             mapper_right = mapping_method()
             mapper_left = mapping_method()
+            mapper_right.before_training(stored_observations)
+            mapper_left.before_training(stored_observations)
             mapper_right.train_from_data(stored_observations, is_left=False)
             mapper_left.train_from_data(stored_observations, is_left=True)
             mean_errors_left=[]
@@ -162,6 +164,8 @@ class CaptureCalibrator(LogMaster):
             mean_error_right = np.mean(mean_errors_right)
            
             mean_error = (mean_error_left+mean_error_right)/2
+            print("mean error")
+            print(mean_error)
             mean_angular_error = np.degrees(np.arctan(mean_error/distance))
             print(mapping_method)
             print("mean_angular_error")
