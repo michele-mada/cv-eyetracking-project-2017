@@ -12,7 +12,9 @@ def parsecli():
     parser.add_argument('-o', '--override-screensize', metavar='1366x768', help='specify the size of your screen',
                         type=str, default="None")
     parser.add_argument('-f', '--face-window', help='show face detection window', action='store_true')
-    parser.add_argument('-t', '--test', help='run a second time to test accuracy', type=int, default=0)
+    parser.add_argument('-t', '--test', help='specify distance in cm from screen to run test accuracy', type=int, default=0)
+    parser.add_argument('-d', '--diagonal-inch', help='specify the size in inches of your screen diagonal ',
+                        type=float, default="15.5")
     return parser.parse_args()
 
 
@@ -73,7 +75,7 @@ def start_calibration(event):
         distance_from_screen = cli.test
         distance_inch = distance_from_screen/2.54
         diagonal_pixel = np.sqrt(screen_x**2 + screen_y**2)
-        diagonal_inch = 15.5 #size of my screen
+        diagonal_inch = cli.diagonal_inch
         ppi = diagonal_pixel/diagonal_inch
         distance_pixel = distance_inch*ppi
         print(distance_from_screen)

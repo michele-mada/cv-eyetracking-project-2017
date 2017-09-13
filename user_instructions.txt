@@ -1,0 +1,53 @@
+To run the gaze tracking:
+
+positional arguments:
+  file                  filename of the picture; - for webcam; "test" to run a
+                        performance test
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d, --debug           enable debug mode
+  -A {None,chrome,firefox}, --app {None,chrome,firefox}
+                        drive the scrolling of an application. Default is None.
+  -q, --quiet           suppress all windows, except the application one (see -A)
+  --eye-cascade-file EYE_CASCADE_FILE
+                        path to the .xml file with the eye-detection haar cascade
+  --face-cascade-file FACE_CASCADE_FILE
+                        path to the .xml file with the face-detection haar cascade
+  --saturation SATURATION
+                        override the webcam default saturation setting (value [0.0, 1.0])
+  --contrast CONTRAST   override the webcam default contrast setting (value [0.0, 1.0])
+  -c CAMERA_PORT, --camera-port CAMERA_PORT
+                        numeric index of the camera to use
+  -a {timm,gip,hough}, --algo {timm,gip,hough}
+                        pupil center algorithm to use
+  -e {ah,h,lsh}, --equalization {ah,h,lsh}
+                        type of histogram equalization to use
+  -u, --unicorn         draw a debug vector indicating the face orientation
+  -t, --tracking        display the eye tracking whiteboard
+  -m {poly_quad,fuzzy,neural,poly_lin}, --mapping-function {poly_quad,fuzzy,neural,poly_lin}
+                        eye-vector to screen mapping function to use
+  -o 1366x768, --override-screensize 1366x768
+                        specify the size of your tracking board
+  --smoothing int       smooth the tracking data averaging across the last N frames
+  --centroid-history int
+                        compute the gaze centroid across the last N frames
+  --bioid-folder BIOID_FOLDER
+                        BioID face database folder, to use in the "test" mode
+								
+								
+example: python main.py - -t -m poly_quad
+
+
+To run calibration:
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o 1366x768, --override-screensize 1366x768
+                        specify the size of your screen
+  -f, --face-window     show face detection window
+  -t TEST, --test TEST  specify distance in cm from screen to run test accuracy
+  -d DIAGONAL_INCH, --diagonal-inch DIAGONAL_INCH
+                        specify the size in inches of your screen diagonal
+								
+example: python calibration_gui.py -t 50
